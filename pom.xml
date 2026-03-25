@@ -6,29 +6,51 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>4.0.4</version>
-        <relativePath/> <!-- lookup parent from repository -->
+        <relativePath/>
     </parent>
     <groupId>com.nbrt</groupId>
     <artifactId>dtracing</artifactId>
     <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
     <name>dtracing</name>
-    <description>dtracing</description>
-    <url/>
-    <licenses>
-        <license/>
-    </licenses>
-    <developers>
-        <developer/>
-    </developers>
-    <scm>
-        <connection/>
-        <developerConnection/>
-        <tag/>
-        <url/>
-    </scm>
+    <description>dtracing - distributed tracing parent</description>
+
+    <modules>
+        <module>common</module>
+        <module>market-data-handler</module>
+        <module>book-builder</module>
+        <module>mid-pricer</module>
+        <module>price-tiering</module>
+    </modules>
+
     <properties>
         <java.version>26</java.version>
+        <aeron.version>1.50.4</aeron.version>
+        <!-- agrona is bundled inside aeron-all but declared separately for common -->
+        <agrona.version>2.4.0</agrona.version>
+        <sbe.version>1.37.1</sbe.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.aeron</groupId>
+                <artifactId>aeron-all</artifactId>
+                <version>${aeron.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.agrona</groupId>
+                <artifactId>agrona</artifactId>
+                <version>${agrona.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.nbrt</groupId>
+                <artifactId>common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -50,7 +72,10 @@
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-tracing-bridge-brave</artifactId>
         </dependency>
-
+        <dependency>
+            <groupId>io.aeron</groupId>
+            <artifactId>aeron-all</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>

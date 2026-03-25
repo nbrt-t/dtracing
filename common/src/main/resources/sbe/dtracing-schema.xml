@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sbe:messageSchema xmlns:sbe="http://fixprotocol.io/2016/sbe"
+                   package="com.nbrt.dtracing.common.sbe"
+                   id="1"
+                   version="0"
+                   semanticVersion="5.2"
+                   description="dtracing FX pricing pipeline — SBE message definitions"
+                   byteOrder="littleEndian">
+
+    <types>
+
+        <!-- ── Standard SBE message framing header ─────────────────────────── -->
+        <composite name="messageHeader" description="SBE message frame header">
+            <type name="blockLength" primitiveType="uint16"/>
+            <type name="templateId"  primitiveType="uint16"/>
+            <type name="schemaId"    primitiveType="uint16"/>
+            <type name="version"     primitiveType="uint16"/>
+        </composite>
+
+        <!-- ── Timestamp ────────────────────────────────────────────────────── -->
+        <!--  int64 nanoseconds since Unix epoch (1970-01-01T00:00:00.000000000Z) -->
+        <type name="NanoTimestamp"
+              primitiveType="int64"
+              semanticType="UTCTimestamp"
+              description="Nanoseconds since Unix epoch"/>
+
+        <!-- ── Fixed-point price: mantissa × 10^-5  (5 decimal places) ──────── -->
+        <!--  e.g.  EURUSD 1.08765 is stored as mantissa = 108765, exponent = -5  -->
+        <composite name="Decimal5" semanticType="Price"
+                   description="Fixed-point decimal with 5 implied decimal places">
+            <type name="mantissa" primitiveType="int64"/>
+            <type name="exponent" primitiveType="int8" presence="constant">-5</type>
+        </composite>
+
+        <!-- ── ECN (Electronic Communication Network) ───────────────────────── -->
+        <enum name="Ecn" encodingType="uint8"
+              description="Source electronic communication network">
+            <validValue name="EURONEXT" description="Euronext">0</validValue>
+            <validValue name="EBS"      description="EBS – Electronic Broking Services">1</validValue>
+            <validValue name="FENICS"   description="Fenics FX">2</validValue>
+        </enum>
+
+        <!-- ── FX Currency Pair ──────────────────────────────────────────────── -->
+        <enum name="CcyPair" encodingType="uint8"
+              description="ISO 4217 FX currency pair">
+            <validValue name="EURUSD">0</validValue>
+            <validValue name="GBPUSD">1</validValue>
+            <validValue name="USDJPY">2</validValue>
+            <validValue name="USDCHF">3</validValue>
+            <validValue name="AUDUSD">4</validValue>
+            <validValue name="USDCAD">5</validValue>
+            <validValue name="NZDUSD">6</validValue>
+            <validValue name="EURGBP">7</validValue>
+            <validValue name="EURJPY">8</validValue>
+            <validValue name="GBPJPY">9</validValue>
+            <validValue name="EURCHF">10</validValue>
+            <validValue name="AUDJPY">11</validValue>
+        </enum>
+
+    </types>
+
+    <!-- ════════════════════════════════════════════════════════════════════════
+         Message 1 — FxMarketData
+         Raw best-bid/offer tick received from an ECN feed.
+         ════════════════════════════════════════════════════════════════════════ -->
+    <message name="FxMarketData" id="1"
+             description="Raw BBO tick from an ECN">
+        <field name="ecn"       id="1" type="Ecn"
+               description="Source ECN"/>
+        <field name="ccyPair"   id="2" type="CcyPair"
+               description="Currency pair"/>
+        <field name="timestamp" id="3" type="NanoTimestamp"
+               description="Feed timestamp – nanoseconds since Unix epoch"/>
+        <field name="bidPrice"  id="4" type="Decimal5"
+               description="Best bid price (5 d.p.)"/>
+        <field name="bidSize"   id="5" type="int32"
+               description="Bid notional size (thousands of base currency)"/>
+        <field name="askPrice"  id="6" type="Decimal5"
+               description="Best ask price (5 d.p.)"/>
+        <field name="askSize"   id="7" type="int32"
+               description="Ask notional size (thousands of base currency)"/>
+    </message>
+
+    <!-- ════════════════════════════════════════════════════════════════════════
+         Message 2 — VenueOrderBook
+         A single price level in the venue-aggregated order book.
+         ════════════════════════════════════════════════════════════════════════ -->
+    <message name="VenueOrderBook" id="2"
+             description="Price level in the venue order book">
+        <field name="ecn"     id="1" type="Ecn"
+               description="Venue / ECN that owns this level"/>
+        <field name="ccyPair" id="2" type="CcyPair"
+               description="Currency pair"/>
+        <field name="rate"    id="3" type="Decimal5"
+               description="Price level rate (5 d.p.)"/>
+        <field name="askSize" id="4" type="int32"
+               description="Ask quantity at this level"/>
+        <field name="bidSize" id="5" type="int32"
+               description="Bid quantity at this level"/>
+    </message>
+
+    <!-- ════════════════════════════════════════════════════════════════════════
+         Message 3 — MidPriceBook
+         Mid price derived by the MidPricer from the aggregated order book.
+         ════════════════════════════════════════════════════════════════════════ -->
+    <message name="MidPriceBook" id="3"
+             description="Calculated mid price for a currency pair">
+        <field name="ccyPair"  id="1" type="CcyPair"
+               description="Currency pair"/>
+        <field name="midPrice" id="2" type="Decimal5"
+               description="Mid price (5 d.p.)"/>
+        <field name="midSize"  id="3" type="int32"
+               description="Available size at mid"/>
+    </message>
+
+    <!-- ════════════════════════════════════════════════════════════════════════
+         Message 4 — TieredPrice
+         Client-facing tiered price produced by the PriceTiering engine.
+         ════════════════════════════════════════════════════════════════════════ -->
+    <message name="TieredPrice" id="4"
+             description="Tiered/spread price distributed to clients">
+        <field name="ccyPair"  id="1" type="CcyPair"
+               description="Currency pair"/>
+        <field name="tierNo"   id="2" type="uint8"
+               description="Tier number (1 = tightest spread)"/>
+        <field name="askPrice" id="3" type="Decimal5"
+               description="Tiered ask price (5 d.p.)"/>
+        <field name="askSize"  id="4" type="int32"
+               description="Ask size for this tier"/>
+        <field name="bidPrice" id="5" type="Decimal5"
+               description="Tiered bid price (5 d.p.)"/>
+        <field name="bidSize"  id="6" type="int32"
+               description="Bid size for this tier"/>
+    </message>
+
+    <!-- ════════════════════════════════════════════════════════════════════════
+         Message 5 — FxFeedDelta
+         Inbound delta received over a raw UDP market-data feed.
+         One datagram = one delta for a single currency pair.
+         ════════════════════════════════════════════════════════════════════════ -->
+    <message name="FxFeedDelta" id="5"
+             description="Inbound UDP market-data delta">
+        <field name="sequenceNumber" id="1" type="uint64"
+               description="Monotonically increasing sequence number for gap detection"/>
+        <field name="ccyPair"   id="2" type="CcyPair"
+               description="Currency pair"/>
+        <field name="timestamp" id="3" type="NanoTimestamp"
+               description="Feed timestamp – nanoseconds since Unix epoch"/>
+        <field name="askPrice"  id="4" type="Decimal5"
+               description="Ask price (5 d.p.)"/>
+        <field name="askSize"   id="5" type="int32"
+               description="Ask notional size"/>
+        <field name="bidPrice"  id="6" type="Decimal5"
+               description="Bid price (5 d.p.)"/>
+        <field name="bidSize"   id="7" type="int32"
+               description="Bid notional size"/>
+    </message>
+
+</sbe:messageSchema>
