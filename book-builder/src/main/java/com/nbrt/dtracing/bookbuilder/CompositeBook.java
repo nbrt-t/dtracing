@@ -14,7 +14,8 @@ import com.nbrt.dtracing.common.sbe.Ecn;
  */
 public class CompositeBook {
 
-    private static final int MAX_DEPTH = Ecn.values().length;
+    // One level per real ECN; excludes SBE NULL_VAL sentinel
+    private static final int MAX_DEPTH = 3;
 
     private final long[] bidPrices = new long[MAX_DEPTH];
     private final int[] bidSizes = new int[MAX_DEPTH];

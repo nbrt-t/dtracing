@@ -24,7 +24,8 @@ public class PriceTieringProcessor implements MidPriceBookHandler {
 
     private static final Logger log = LoggerFactory.getLogger(PriceTieringProcessor.class);
 
-    private static final int CCY_PAIR_COUNT = CcyPair.values().length;
+    // 12 real pairs (0..11); excludes SBE NULL_VAL sentinel (255)
+    private static final int CCY_PAIR_COUNT = 12;
 
     private final int tierCount;
 
@@ -44,8 +45,9 @@ public class PriceTieringProcessor implements MidPriceBookHandler {
         this.tieredAskPrices = new long[CCY_PAIR_COUNT][tierCount];
         this.tieredSizes = new int[CCY_PAIR_COUNT][tierCount];
 
-        // Pre-compute half-spreads per pair
+        // Pre-compute half-spreads per pair (skip SBE NULL_VAL sentinel)
         for (var ccyPair : CcyPair.values()) {
+            if (ccyPair == CcyPair.NULL_VAL) continue;
             halfSpreads[ccyPair.value()] = spreadMatrix.halfSpreadsFor(ccyPair);
         }
 

@@ -14,7 +14,9 @@ public class MarketDataDeltaProcessor implements MarketDataDeltaHandler {
     private static final long LOG_SAMPLE_INTERVAL = 10_000;
 
     // One book per CcyPair ordinal — zero-allocation lookup, no map needed
-    private final OrderBook[] books = new OrderBook[CcyPair.values().length];
+    // 12 real pairs (0..11); excludes SBE NULL_VAL sentinel (255)
+    private static final int CCY_PAIR_COUNT = 12;
+    private final OrderBook[] books = new OrderBook[CCY_PAIR_COUNT];
 
     private final String ecn;
     private final AeronFxMarketDataPublisher publisher;

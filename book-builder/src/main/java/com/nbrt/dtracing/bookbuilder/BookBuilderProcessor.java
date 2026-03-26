@@ -20,8 +20,9 @@ public class BookBuilderProcessor implements FxMarketDataHandler {
 
     private static final Logger log = LoggerFactory.getLogger(BookBuilderProcessor.class);
 
-    private static final int ECN_COUNT = Ecn.values().length;
-    private static final int CCY_PAIR_COUNT = CcyPair.values().length;
+    // Excludes SBE NULL_VAL sentinels (value 255)
+    private static final int ECN_COUNT = 3;
+    private static final int CCY_PAIR_COUNT = 12;
 
     // Per-venue BBO: [ecn ordinal][ccyPair ordinal]
     private final VenueBook[][] venueBooks = new VenueBook[ECN_COUNT][CCY_PAIR_COUNT];

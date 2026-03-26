@@ -21,8 +21,9 @@ public class MidPricerProcessor implements VenueOrderBookHandler {
 
     private static final Logger log = LoggerFactory.getLogger(MidPricerProcessor.class);
 
-    private static final int ECN_COUNT = Ecn.values().length;
-    private static final int CCY_PAIR_COUNT = CcyPair.values().length;
+    // Excludes SBE NULL_VAL sentinels (value 255)
+    private static final int ECN_COUNT = 3;
+    private static final int CCY_PAIR_COUNT = 12;
 
     // Per-venue best bid/ask: [ecn ordinal][ccyPair ordinal]
     private final long[][] venueBidPrices = new long[ECN_COUNT][CCY_PAIR_COUNT];
