@@ -11,8 +11,10 @@ public class MarketDataDeltaProcessor implements MarketDataDeltaHandler {
     private static final Logger log = LoggerFactory.getLogger(MarketDataDeltaProcessor.class);
 
     private static final double DECIMAL5_SCALE = 1e-5;
+    private static final long LOG_SAMPLE_INTERVAL = 10_000;
 
     private final String ecn;
+    private long messageCount;
 
     public MarketDataDeltaProcessor(UdpFeedProperties properties) {
         this.ecn = properties.ecn();
@@ -20,17 +22,20 @@ public class MarketDataDeltaProcessor implements MarketDataDeltaHandler {
 
     @Override
     public void onDelta(FxFeedDeltaDecoder decoder) {
-        var ccyPair  = decoder.ccyPair();
-        var ts       = decoder.timestamp();
-        var bidPrice = decoder.bidPrice().mantissa() * DECIMAL5_SCALE;
-        var bidSize  = decoder.bidSize();
-        var askPrice = decoder.askPrice().mantissa() * DECIMAL5_SCALE;
-        var askSize  = decoder.askSize();
-        var seq      = decoder.sequenceNumber();
+        messageCount++;
 
-        log.info("[{}] DELTA seq={} {} ts={} bid={}/{} ask={}/{}",
-                ecn, seq, ccyPair, ts,
-                String.format("%.5f", bidPrice), bidSize,
-                String.format("%.5f", askPrice), askSize);
+        // Hot path — only log sampled messages to avoid per-message overhead
+        if (log.isDebugEnabled() && messageCount % LOG_SAMPLE_INTERVAL == 0) {
+            log.debug("[{}] DELTA seq={} {} ts={} bid={}/{} ask={}/{} (count={})",
+                    ecn,
+                    decoder.sequenceNumber(),
+                    decoder.ccyPair(),
+                    decoder.timestamp(),
+                    decoder.bidPrice().mantissa(),
+                    decoder.bidSize(),
+                    decoder.askPrice().mantissa(),
+                    decoder.askSize(),
+                    messageCount);
+        }
     }
 }
