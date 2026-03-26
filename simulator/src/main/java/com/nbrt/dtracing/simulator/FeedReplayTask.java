@@ -57,6 +57,7 @@ public class FeedReplayTask implements Runnable {
         long csvBaseTimestamp = -1;
         long wallBaseNanos = -1;
         long prevCsvTimestamp = -1;
+        long sequenceCounter = 0;
         int rowCount = 0;
 
         try (var socket = new DatagramSocket();
@@ -77,8 +78,8 @@ public class FeedReplayTask implements Runnable {
                     continue;
                 }
 
-                long sequenceNumber = Long.parseUnsignedLong(fields[0].strip());
-                // fields[1] = ecn (used for routing, not encoded)
+                // CSV sequence number used only for ordering; generate contiguous sequence for the wire
+                // fields[0] = csv sequence (ignored), fields[1] = ecn (used for routing, not encoded)
                 CcyPair ccyPair       = CcyPair.valueOf(fields[2].strip());
                 long csvTimestamp      = Long.parseLong(fields[3].strip());
                 long bidMantissa      = decimalToMantissa(fields[4].strip());
@@ -107,7 +108,7 @@ public class FeedReplayTask implements Runnable {
 
                 // Encode SBE message (header already written once, reuse it)
                 deltaEncoder.wrap(directBuffer, MessageHeaderEncoder.ENCODED_LENGTH);
-                deltaEncoder.sequenceNumber(sequenceNumber);
+                deltaEncoder.sequenceNumber(++sequenceCounter);
                 deltaEncoder.ccyPair(ccyPair);
                 deltaEncoder.timestamp(rebasedTimestamp);
                 deltaEncoder.askPrice().mantissa(askMantissa);
