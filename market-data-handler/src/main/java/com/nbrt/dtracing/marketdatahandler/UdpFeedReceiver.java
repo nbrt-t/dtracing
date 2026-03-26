@@ -80,8 +80,10 @@ public class UdpFeedReceiver implements SmartLifecycle {
 
                 long seq = deltaDecoder.sequenceNumber();
                 if (expectedSeq >= 0 && seq != expectedSeq) {
-                    long gap = seq - expectedSeq;
-                    log.warn("Sequence gap detected: expected={} received={} missed={}", expectedSeq, seq, gap);
+                    if (log.isWarnEnabled()) {
+                        log.warn("Sequence gap detected: expected={} received={} missed={}",
+                                expectedSeq, seq, seq - expectedSeq);
+                    }
                 }
                 expectedSeq = seq + 1;
 
