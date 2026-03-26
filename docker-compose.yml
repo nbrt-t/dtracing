@@ -83,6 +83,38 @@ services:
       - mdh-ebs
       - mdh-fenics
 
+  mid-pricer:
+    build:
+      context: .
+      target: mid-pricer
+    container_name: mid-pricer
+    ipc: service:aeron-media-driver
+    volumes:
+      - aeron-dir:/dev/shm/aeron
+    ports:
+      - "8091:8091"
+    networks:
+      - dtracing
+    depends_on:
+      - aeron-media-driver
+      - book-builder
+
+  price-tiering:
+    build:
+      context: .
+      target: price-tiering
+    container_name: price-tiering
+    ipc: service:aeron-media-driver
+    volumes:
+      - aeron-dir:/dev/shm/aeron
+    ports:
+      - "8092:8092"
+    networks:
+      - dtracing
+    depends_on:
+      - aeron-media-driver
+      - mid-pricer
+
 volumes:
   aeron-dir:
     driver: local

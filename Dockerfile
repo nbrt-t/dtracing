@@ -45,6 +45,18 @@ WORKDIR /app
 COPY --from=builder /build/book-builder/target/*.jar app.jar
 ENTRYPOINT ["java", "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED", "-jar", "app.jar"]
 
+# ── mid-pricer runtime ────────────────────────────────────────────────────
+FROM azul/zulu-openjdk:26-jre AS mid-pricer
+WORKDIR /app
+COPY --from=builder /build/mid-pricer/target/*.jar app.jar
+ENTRYPOINT ["java", "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED", "-jar", "app.jar"]
+
+# ── price-tiering runtime ─────────────────────────────────────────────────
+FROM azul/zulu-openjdk:26-jre AS price-tiering
+WORKDIR /app
+COPY --from=builder /build/price-tiering/target/*.jar app.jar
+ENTRYPOINT ["java", "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED", "-jar", "app.jar"]
+
 # ── simulator runtime ──────────────────────────────────────────────────────
 FROM azul/zulu-openjdk:26-jre AS simulator
 WORKDIR /app

@@ -5,7 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
 @SpringBootApplication
-@EnableConfigurationProperties(AeronSubscriberProperties.class)
+@EnableConfigurationProperties({AeronSubscriberProperties.class, AeronPublisherProperties.class})
 public class BookBuilderApplication {
 
     public static void main(String[] args) {

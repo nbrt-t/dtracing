@@ -32,9 +32,11 @@ public class BookBuilderProcessor implements FxMarketDataHandler {
     // Scratch array for passing venue books to rebuild — avoids allocation per call
     private final VenueBook[] venueSlice = new VenueBook[ECN_COUNT];
 
+    private final AeronVenueOrderBookPublisher publisher;
     private long messageCount;
 
-    public BookBuilderProcessor() {
+    public BookBuilderProcessor(AeronVenueOrderBookPublisher publisher) {
+        this.publisher = publisher;
         for (int e = 0; e < ECN_COUNT; e++) {
             for (int c = 0; c < CCY_PAIR_COUNT; c++) {
                 venueBooks[e][c] = new VenueBook(Ecn.values()[e]);
@@ -67,6 +69,9 @@ public class BookBuilderProcessor implements FxMarketDataHandler {
         }
         var composite = compositeBooks[ccyIdx];
         composite.rebuild(venueSlice);
+
+        // Publish composite levels to MidPricer via Aeron IPC
+        publisher.publishComposite(ccyPair, composite);
 
         log.info("[{}] {} composite: bids={} asks={} bestBid={}/{} bestAsk={}/{}  (total={})",
                 ecn, ccyPair,
