@@ -1,43 +1,77 @@
 services:
 
+  aeron-media-driver:
+    build:
+      context: .
+      target: aeron-media-driver
+    container_name: aeron-media-driver
+    ipc: shareable
+    volumes:
+      - aeron-dir:/dev/shm/aeron
+    networks:
+      - dtracing
+
   mdh-euronext:
     build:
       context: .
       target: market-data-handler
     container_name: mdh-euronext
+    ipc: service:aeron-media-driver
     environment:
       SPRING_PROFILES_ACTIVE: euronext
+    volumes:
+      - aeron-dir:/dev/shm/aeron
     ports:
       - "8081:8081"
       - "9001:9001/udp"
     networks:
       - dtracing
+    depends_on:
+      - aeron-media-driver
 
   mdh-ebs:
     build:
       context: .
       target: market-data-handler
     container_name: mdh-ebs
+    ipc: service:aeron-media-driver
     environment:
       SPRING_PROFILES_ACTIVE: ebs
+    volumes:
+      - aeron-dir:/dev/shm/aeron
     ports:
       - "8082:8082"
       - "9002:9002/udp"
     networks:
       - dtracing
+    depends_on:
+      - aeron-media-driver
 
   mdh-fenics:
     build:
       context: .
       target: market-data-handler
     container_name: mdh-fenics
+    ipc: service:aeron-media-driver
     environment:
       SPRING_PROFILES_ACTIVE: fenics
+    volumes:
+      - aeron-dir:/dev/shm/aeron
     ports:
       - "8083:8083"
       - "9003:9003/udp"
     networks:
       - dtracing
+    depends_on:
+      - aeron-media-driver
+
+volumes:
+  aeron-dir:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=64m
 
 networks:
   dtracing:

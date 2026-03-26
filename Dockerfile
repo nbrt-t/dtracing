@@ -5,22 +5,33 @@ WORKDIR /build
 # Cache Maven wrapper + dependencies first
 COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
-COPY common/pom.xml            common/pom.xml
+COPY common/pom.xml              common/pom.xml
 COPY market-data-handler/pom.xml market-data-handler/pom.xml
-COPY book-builder/pom.xml      book-builder/pom.xml
-COPY mid-pricer/pom.xml        mid-pricer/pom.xml
-COPY price-tiering/pom.xml     price-tiering/pom.xml
-COPY simulator/pom.xml         simulator/pom.xml
+COPY book-builder/pom.xml        book-builder/pom.xml
+COPY mid-pricer/pom.xml          mid-pricer/pom.xml
+COPY price-tiering/pom.xml       price-tiering/pom.xml
+COPY aeron-media-driver/pom.xml  aeron-media-driver/pom.xml
+COPY simulator/pom.xml           simulator/pom.xml
 RUN chmod +x mvnw && ./mvnw -B dependency:go-offline -q || true
 
 # Copy sources and build
-COPY common/             common/
+COPY common/              common/
 COPY market-data-handler/ market-data-handler/
-COPY book-builder/       book-builder/
-COPY mid-pricer/         mid-pricer/
-COPY price-tiering/      price-tiering/
-COPY simulator/          simulator/
+COPY book-builder/        book-builder/
+COPY mid-pricer/          mid-pricer/
+COPY price-tiering/       price-tiering/
+COPY aeron-media-driver/  aeron-media-driver/
+COPY simulator/           simulator/
 RUN ./mvnw -B clean package -DskipTests -q
+
+# ── aeron-media-driver runtime ─────────────────────────────────────────────
+FROM azul/zulu-openjdk:26-jre AS aeron-media-driver
+WORKDIR /app
+COPY --from=builder /build/aeron-media-driver/target/*.jar app.jar
+ENTRYPOINT ["java", \
+    "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED", \
+    "-Daeron.dir=/dev/shm/aeron", \
+    "-jar", "app.jar"]
 
 # ── market-data-handler runtime ─────────────────────────────────────────────
 FROM azul/zulu-openjdk:26-jre AS market-data-handler
