@@ -26,11 +26,11 @@ RUN ./mvnw -B clean package -DskipTests -q
 FROM azul/zulu-openjdk:26-jre AS market-data-handler
 WORKDIR /app
 COPY --from=builder /build/market-data-handler/target/*.jar app.jar
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED", "-jar", "app.jar"]
 
 # ── simulator runtime ──────────────────────────────────────────────────────
 FROM azul/zulu-openjdk:26-jre AS simulator
 WORKDIR /app
 COPY --from=builder /build/simulator/target/*.jar app.jar
 COPY simulator/data/ data/
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED", "-jar", "app.jar"]
