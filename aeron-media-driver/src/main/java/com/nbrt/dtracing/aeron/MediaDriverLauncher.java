@@ -25,7 +25,7 @@ public class MediaDriverLauncher {
     private static final PrintStream OUT = System.out;
 
     public static void main(String[] args) {
-        var aeronDir = System.getProperty("aeron.dir", "/dev/shm/aeron");
+        var aeronDir = System.getProperty("aeron.dir", "/dev/shm/aeron/driver");
         var threadingMode = ThreadingMode.valueOf(
                 System.getProperty("aeron.threading.mode", "DEDICATED"));
         var termBufferLength = Integer.parseInt(
