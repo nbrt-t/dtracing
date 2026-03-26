@@ -3,7 +3,6 @@ package com.nbrt.dtracing.aeron;
 import io.aeron.driver.MediaDriver;
 import io.aeron.driver.ThreadingMode;
 import org.agrona.concurrent.ShutdownSignalBarrier;
-import org.agrona.concurrent.SigInt;
 
 import java.io.PrintStream;
 
@@ -51,11 +50,6 @@ public class MediaDriverLauncher {
             OUT.println("  threading      : " + ctx.threadingMode());
             OUT.println("  term buffer    : " + ctx.publicationTermBufferLength() + " bytes");
             OUT.println("  delete on start: " + deleteOnStart);
-
-            SigInt.register(() -> {
-                OUT.println("Shutdown signal received");
-                barrier.signal();
-            });
 
             barrier.await();
             OUT.println("Aeron Media Driver shutting down");
