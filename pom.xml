@@ -22,6 +22,7 @@
         <module>mid-pricer</module>
         <module>price-tiering</module>
         <module>aeron-media-driver</module>
+        <module>trace-collector</module>
         <module>simulator</module>
     </modules>
 

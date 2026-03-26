@@ -11,6 +11,7 @@ COPY book-builder/pom.xml        book-builder/pom.xml
 COPY mid-pricer/pom.xml          mid-pricer/pom.xml
 COPY price-tiering/pom.xml       price-tiering/pom.xml
 COPY aeron-media-driver/pom.xml  aeron-media-driver/pom.xml
+COPY trace-collector/pom.xml     trace-collector/pom.xml
 COPY simulator/pom.xml           simulator/pom.xml
 RUN chmod +x mvnw && ./mvnw -B dependency:go-offline -q || true
 
@@ -21,6 +22,7 @@ COPY book-builder/        book-builder/
 COPY mid-pricer/          mid-pricer/
 COPY price-tiering/       price-tiering/
 COPY aeron-media-driver/  aeron-media-driver/
+COPY trace-collector/     trace-collector/
 COPY simulator/           simulator/
 RUN ./mvnw -B clean package -DskipTests -q
 
@@ -56,6 +58,15 @@ FROM azul/zulu-openjdk:26-jre AS price-tiering
 WORKDIR /app
 COPY --from=builder /build/price-tiering/target/*.jar app.jar
 ENTRYPOINT ["java", "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED", "-jar", "app.jar"]
+
+# ── trace-collector runtime ───────────────────────────────────────────────
+FROM azul/zulu-openjdk:26-jre AS trace-collector
+WORKDIR /app
+COPY --from=builder /build/trace-collector/target/*.jar app.jar
+ENTRYPOINT ["java", \
+    "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED", \
+    "-Daeron.dir=/dev/shm/aeron/driver", \
+    "-jar", "app.jar"]
 
 # ── simulator runtime ──────────────────────────────────────────────────────
 FROM azul/zulu-openjdk:26-jre AS simulator

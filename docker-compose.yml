@@ -115,6 +115,22 @@ services:
       - aeron-media-driver
       - mid-pricer
 
+  trace-collector:
+    build:
+      context: .
+      target: trace-collector
+    container_name: trace-collector
+    ipc: service:aeron-media-driver
+    environment:
+      JAVA_TOOL_OPTIONS: >-
+        -Dotlp.endpoint=http://tempo:4317
+    volumes:
+      - aeron-dir:/dev/shm/aeron
+    networks:
+      - dtracing
+    depends_on:
+      - aeron-media-driver
+
 volumes:
   aeron-dir:
     driver: local
