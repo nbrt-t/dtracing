@@ -1,0 +1,44 @@
+services:
+
+  mdh-euronext:
+    build:
+      context: .
+      target: market-data-handler
+    container_name: mdh-euronext
+    environment:
+      SPRING_PROFILES_ACTIVE: euronext
+    ports:
+      - "8081:8081"
+      - "9001:9001/udp"
+    networks:
+      - dtracing
+
+  mdh-ebs:
+    build:
+      context: .
+      target: market-data-handler
+    container_name: mdh-ebs
+    environment:
+      SPRING_PROFILES_ACTIVE: ebs
+    ports:
+      - "8082:8082"
+      - "9002:9002/udp"
+    networks:
+      - dtracing
+
+  mdh-fenics:
+    build:
+      context: .
+      target: market-data-handler
+    container_name: mdh-fenics
+    environment:
+      SPRING_PROFILES_ACTIVE: fenics
+    ports:
+      - "8083:8083"
+      - "9003:9003/udp"
+    networks:
+      - dtracing
+
+networks:
+  dtracing:
+    name: dtracing

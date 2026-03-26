@@ -37,9 +37,10 @@ public class UdpFeedReceiver implements SmartLifecycle {
     public void start() {
         running = true;
         receiverThread = Thread.ofVirtual()
-                .name("udp-feed-receiver")
+                .name("udp-feed-receiver-" + properties.ecn().toLowerCase())
                 .start(this::receiveLoop);
-        log.info("UDP feed receiver starting on {}:{}{}", properties.bindAddress(), properties.port(),
+        log.info("UDP feed receiver [{}] starting on {}:{}{}", properties.ecn(),
+                properties.bindAddress(), properties.port(),
                 properties.isMulticast() ? " multicast=" + properties.multicastGroup() : "");
     }
 
@@ -52,7 +53,7 @@ public class UdpFeedReceiver implements SmartLifecycle {
         if (receiverThread != null) {
             receiverThread.interrupt();
         }
-        log.info("UDP feed receiver stopped");
+        log.info("UDP feed receiver [{}] stopped", properties.ecn());
     }
 
     @Override

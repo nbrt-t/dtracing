@@ -1,0 +1,16 @@
+services:
+
+  simulator:
+    build:
+      context: .
+      target: simulator
+    container_name: simulator
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    networks:
+      - dtracing
+
+networks:
+  dtracing:
+    external: true
+    name: dtracing

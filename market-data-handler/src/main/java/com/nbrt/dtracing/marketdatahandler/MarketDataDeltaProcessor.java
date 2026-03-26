@@ -12,6 +12,12 @@ public class MarketDataDeltaProcessor implements MarketDataDeltaHandler {
 
     private static final double DECIMAL5_SCALE = 1e-5;
 
+    private final String ecn;
+
+    public MarketDataDeltaProcessor(UdpFeedProperties properties) {
+        this.ecn = properties.ecn();
+    }
+
     @Override
     public void onDelta(FxFeedDeltaDecoder decoder) {
         var ccyPair  = decoder.ccyPair();
@@ -20,11 +26,10 @@ public class MarketDataDeltaProcessor implements MarketDataDeltaHandler {
         var bidSize  = decoder.bidSize();
         var askPrice = decoder.askPrice().mantissa() * DECIMAL5_SCALE;
         var askSize  = decoder.askSize();
+        var seq      = decoder.sequenceNumber();
 
-        var seq = decoder.sequenceNumber();
-
-        log.info("DELTA seq={} {} ts={} bid={}/{} ask={}/{}",
-                seq, ccyPair, ts,
+        log.info("[{}] DELTA seq={} {} ts={} bid={}/{} ask={}/{}",
+                ecn, seq, ccyPair, ts,
                 String.format("%.5f", bidPrice), bidSize,
                 String.format("%.5f", askPrice), askSize);
     }

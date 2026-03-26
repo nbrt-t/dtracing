@@ -1,0 +1,8 @@
+**/target/
+.idea/
+*.iml
+.git/
+.gitattributes
+HELP.md
+CLAUDE.md
+.claude/
