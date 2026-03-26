@@ -50,13 +50,13 @@ public class BookBuilderProcessor implements FxMarketDataHandler {
         var venueBook = venueBooks[ecn.value()][ccyPair.value()];
         venueBook.update(timestamp, bidMantissa, bidSize, askMantissa, askSize);
 
-        if (log.isDebugEnabled() && messageCount % LOG_SAMPLE_INTERVAL == 0) {
-            log.debug("[{}] {} venue book: bid={}/{} ask={}/{}  (total={})",
+        //if (log.isDebugEnabled() && messageCount % LOG_SAMPLE_INTERVAL == 0) {
+            log.info("[{}] {} venue book: bid={}/{} ask={}/{}  (total={})",
                     ecn, ccyPair,
                     bidMantissa, bidSize,
                     askMantissa, askSize,
                     messageCount);
-        }
+        //}
     }
 
     /**
