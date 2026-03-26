@@ -30,7 +30,7 @@ WORKDIR /app
 COPY --from=builder /build/aeron-media-driver/target/*.jar app.jar
 ENTRYPOINT ["java", \
     "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED", \
-    "-Daeron.dir=/dev/shm/aeron", \
+    "-Daeron.dir=/dev/shm/aeron/driver", \
     "-jar", "app.jar"]
 
 # ── market-data-handler runtime ─────────────────────────────────────────────
