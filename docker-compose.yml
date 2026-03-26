@@ -65,6 +65,24 @@ services:
     depends_on:
       - aeron-media-driver
 
+  book-builder:
+    build:
+      context: .
+      target: book-builder
+    container_name: book-builder
+    ipc: service:aeron-media-driver
+    volumes:
+      - aeron-dir:/dev/shm/aeron
+    ports:
+      - "8090:8090"
+    networks:
+      - dtracing
+    depends_on:
+      - aeron-media-driver
+      - mdh-euronext
+      - mdh-ebs
+      - mdh-fenics
+
 volumes:
   aeron-dir:
     driver: local

@@ -5,7 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
 @SpringBootApplication
-@EnableConfigurationProperties(UdpFeedProperties.class)
+@EnableConfigurationProperties({UdpFeedProperties.class, AeronPublisherProperties.class})
 public class MarketDataHandlerApplication {
 
     public static void main(String[] args) {

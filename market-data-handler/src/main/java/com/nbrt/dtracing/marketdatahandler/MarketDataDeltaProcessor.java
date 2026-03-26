@@ -17,10 +17,12 @@ public class MarketDataDeltaProcessor implements MarketDataDeltaHandler {
     private final OrderBook[] books = new OrderBook[CcyPair.values().length];
 
     private final String ecn;
+    private final AeronFxMarketDataPublisher publisher;
     private long messageCount;
 
-    public MarketDataDeltaProcessor(UdpFeedProperties properties) {
+    public MarketDataDeltaProcessor(UdpFeedProperties properties, AeronFxMarketDataPublisher publisher) {
         this.ecn = properties.ecn();
+        this.publisher = publisher;
         for (int i = 0; i < books.length; i++) {
             books[i] = new OrderBook();
         }
@@ -31,6 +33,7 @@ public class MarketDataDeltaProcessor implements MarketDataDeltaHandler {
         messageCount++;
 
         var ccyPair = decoder.ccyPair();
+        long timestamp = decoder.timestamp();
         long bidMantissa = decoder.bidPrice().mantissa();
         int bidSize = decoder.bidSize();
         long askMantissa = decoder.askPrice().mantissa();
@@ -39,6 +42,12 @@ public class MarketDataDeltaProcessor implements MarketDataDeltaHandler {
         var book = books[ccyPair.value()];
         book.updateBid(bidMantissa, bidSize);
         book.updateAsk(askMantissa, askSize);
+
+        // Publish current BBO to BookBuilder via Aeron IPC
+        publisher.publish(ccyPair, timestamp, book.bestBid(),
+                book.bidDepth() > 0 ? book.bidSize(0) : 0,
+                book.bestAsk(),
+                book.askDepth() > 0 ? book.askSize(0) : 0);
 
         if (log.isDebugEnabled() && messageCount % LOG_SAMPLE_INTERVAL == 0) {
             log.debug("[{}] {} book: bid={}/{} ask={}/{} depth={}/{}  (count={})",

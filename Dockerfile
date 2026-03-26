@@ -39,6 +39,12 @@ WORKDIR /app
 COPY --from=builder /build/market-data-handler/target/*.jar app.jar
 ENTRYPOINT ["java", "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED", "-jar", "app.jar"]
 
+# ── book-builder runtime ──────────────────────────────────────────────────
+FROM azul/zulu-openjdk:26-jre AS book-builder
+WORKDIR /app
+COPY --from=builder /build/book-builder/target/*.jar app.jar
+ENTRYPOINT ["java", "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED", "-jar", "app.jar"]
+
 # ── simulator runtime ──────────────────────────────────────────────────────
 FROM azul/zulu-openjdk:26-jre AS simulator
 WORKDIR /app
