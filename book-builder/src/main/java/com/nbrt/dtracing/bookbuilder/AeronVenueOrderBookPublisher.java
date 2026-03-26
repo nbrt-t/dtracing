@@ -82,32 +82,39 @@ public class AeronVenueOrderBookPublisher implements SmartLifecycle {
 
     /**
      * Publish all levels of the composite book for a currency pair.
-     * Each level becomes one VenueOrderBook message.
+     * Each level becomes one VenueOrderBook message carrying the trace context.
      */
-    public void publishComposite(CcyPair ccyPair, CompositeBook composite) {
+    public void publishComposite(CcyPair ccyPair, CompositeBook composite,
+                                 long traceId, long spanId, long sequenceNumber) {
         if (!running) {
             return;
         }
 
         // Publish bid levels
         for (int i = 0; i < composite.bidDepth(); i++) {
-            offer(composite.bidEcn(i), ccyPair, composite.bidPrice(i), 0, composite.bidSize(i));
+            offer(composite.bidEcn(i), ccyPair, composite.bidPrice(i), 0, composite.bidSize(i),
+                    traceId, spanId, sequenceNumber);
         }
 
         // Publish ask levels
         for (int i = 0; i < composite.askDepth(); i++) {
-            offer(composite.askEcn(i), ccyPair, composite.askPrice(i), composite.askSize(i), 0);
+            offer(composite.askEcn(i), ccyPair, composite.askPrice(i), composite.askSize(i), 0,
+                    traceId, spanId, sequenceNumber);
         }
     }
 
     private void offer(com.nbrt.dtracing.common.sbe.Ecn ecn, CcyPair ccyPair,
-                       long rateMantissa, int askSize, int bidSize) {
+                       long rateMantissa, int askSize, int bidSize,
+                       long traceId, long spanId, long sequenceNumber) {
         encoder.wrap(buffer, MessageHeaderEncoder.ENCODED_LENGTH);
         encoder.ecn(ecn);
         encoder.ccyPair(ccyPair);
         encoder.rate().mantissa(rateMantissa);
         encoder.askSize(askSize);
         encoder.bidSize(bidSize);
+        encoder.traceId(traceId);
+        encoder.spanId(spanId);
+        encoder.sequenceNumber(sequenceNumber);
 
         long result = publication.offer(buffer, 0, BUF_SIZE);
         if (result >= 0) {

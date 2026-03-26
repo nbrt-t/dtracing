@@ -2,7 +2,7 @@
 <sbe:messageSchema xmlns:sbe="http://fixprotocol.io/2016/sbe"
                    package="com.nbrt.dtracing.common.sbe"
                    id="1"
-                   version="0"
+                   version="1"
                    semanticVersion="5.2"
                    description="dtracing FX pricing pipeline — SBE message definitions"
                    byteOrder="littleEndian">
@@ -57,6 +57,15 @@
             <validValue name="AUDJPY">11</validValue>
         </enum>
 
+        <!-- ── Pipeline stage (for distributed tracing) ───────────────────── -->
+        <enum name="Stage" encodingType="uint8"
+              description="Processing stage in the pricing pipeline">
+            <validValue name="MDH_RECEIVE"  description="Market data handler — UDP receive + decode">0</validValue>
+            <validValue name="BOOK_BUILD"   description="Book builder — composite book rebuild">1</validValue>
+            <validValue name="MID_PRICE"    description="Mid pricer — mid price calculation">2</validValue>
+            <validValue name="PRICE_TIER"   description="Price tiering — spread application">3</validValue>
+        </enum>
+
     </types>
 
     <!-- ════════════════════════════════════════════════════════════════════════
@@ -65,20 +74,26 @@
          ════════════════════════════════════════════════════════════════════════ -->
     <message name="FxMarketData" id="1"
              description="Raw BBO tick from an ECN">
-        <field name="ecn"       id="1" type="Ecn"
+        <field name="ecn"            id="1"  type="Ecn"
                description="Source ECN"/>
-        <field name="ccyPair"   id="2" type="CcyPair"
+        <field name="ccyPair"        id="2"  type="CcyPair"
                description="Currency pair"/>
-        <field name="timestamp" id="3" type="NanoTimestamp"
+        <field name="timestamp"      id="3"  type="NanoTimestamp"
                description="Feed timestamp – nanoseconds since Unix epoch"/>
-        <field name="bidPrice"  id="4" type="Decimal5"
+        <field name="bidPrice"       id="4"  type="Decimal5"
                description="Best bid price (5 d.p.)"/>
-        <field name="bidSize"   id="5" type="int32"
+        <field name="bidSize"        id="5"  type="int32"
                description="Bid notional size (thousands of base currency)"/>
-        <field name="askPrice"  id="6" type="Decimal5"
+        <field name="askPrice"       id="6"  type="Decimal5"
                description="Best ask price (5 d.p.)"/>
-        <field name="askSize"   id="7" type="int32"
+        <field name="askSize"        id="7"  type="int32"
                description="Ask notional size (thousands of base currency)"/>
+        <field name="traceId"        id="8"  type="uint64"
+               description="Trace ID — correlates spans across pipeline stages"/>
+        <field name="spanId"         id="9"  type="uint64"
+               description="Span ID created by the publishing stage"/>
+        <field name="sequenceNumber" id="10" type="uint64"
+               description="Original feed sequence number"/>
     </message>
 
     <!-- ════════════════════════════════════════════════════════════════════════
@@ -87,16 +102,22 @@
          ════════════════════════════════════════════════════════════════════════ -->
     <message name="VenueOrderBook" id="2"
              description="Price level in the venue order book">
-        <field name="ecn"     id="1" type="Ecn"
+        <field name="ecn"            id="1"  type="Ecn"
                description="Venue / ECN that owns this level"/>
-        <field name="ccyPair" id="2" type="CcyPair"
+        <field name="ccyPair"        id="2"  type="CcyPair"
                description="Currency pair"/>
-        <field name="rate"    id="3" type="Decimal5"
+        <field name="rate"           id="3"  type="Decimal5"
                description="Price level rate (5 d.p.)"/>
-        <field name="askSize" id="4" type="int32"
+        <field name="askSize"        id="4"  type="int32"
                description="Ask quantity at this level"/>
-        <field name="bidSize" id="5" type="int32"
+        <field name="bidSize"        id="5"  type="int32"
                description="Bid quantity at this level"/>
+        <field name="traceId"        id="6"  type="uint64"
+               description="Trace ID — correlates spans across pipeline stages"/>
+        <field name="spanId"         id="7"  type="uint64"
+               description="Span ID created by the publishing stage"/>
+        <field name="sequenceNumber" id="8"  type="uint64"
+               description="Original feed sequence number"/>
     </message>
 
     <!-- ════════════════════════════════════════════════════════════════════════
@@ -105,12 +126,20 @@
          ════════════════════════════════════════════════════════════════════════ -->
     <message name="MidPriceBook" id="3"
              description="Calculated mid price for a currency pair">
-        <field name="ccyPair"  id="1" type="CcyPair"
+        <field name="ccyPair"        id="1"  type="CcyPair"
                description="Currency pair"/>
-        <field name="midPrice" id="2" type="Decimal5"
+        <field name="midPrice"       id="2"  type="Decimal5"
                description="Mid price (5 d.p.)"/>
-        <field name="midSize"  id="3" type="int32"
+        <field name="midSize"        id="3"  type="int32"
                description="Available size at mid"/>
+        <field name="traceId"        id="4"  type="uint64"
+               description="Trace ID — correlates spans across pipeline stages"/>
+        <field name="spanId"         id="5"  type="uint64"
+               description="Span ID created by the publishing stage"/>
+        <field name="sequenceNumber" id="6"  type="uint64"
+               description="Original feed sequence number"/>
+        <field name="ecn"            id="7"  type="Ecn"
+               description="Source ECN (carried for tracing context)"/>
     </message>
 
     <!-- ════════════════════════════════════════════════════════════════════════
@@ -154,6 +183,33 @@
                description="Bid price (5 d.p.)"/>
         <field name="bidSize"   id="7" type="int32"
                description="Bid notional size"/>
+    </message>
+
+    <!-- ════════════════════════════════════════════════════════════════════════
+         Message 6 — TraceSpan
+         Distributed tracing span published to the dedicated trace channel.
+         Each pipeline stage emits one span per message processed.
+         ════════════════════════════════════════════════════════════════════════ -->
+    <message name="TraceSpan" id="6"
+             description="Distributed tracing span for pipeline latency analysis">
+        <field name="traceId"        id="1"  type="uint64"
+               description="Trace ID — correlates spans across pipeline stages"/>
+        <field name="spanId"         id="2"  type="uint64"
+               description="Unique span ID for this processing step"/>
+        <field name="parentSpanId"   id="3"  type="uint64"
+               description="Span ID of the upstream stage (0 for root span)"/>
+        <field name="stage"          id="4"  type="Stage"
+               description="Pipeline stage that produced this span"/>
+        <field name="ecn"            id="5"  type="Ecn"
+               description="Source ECN"/>
+        <field name="ccyPair"        id="6"  type="CcyPair"
+               description="Currency pair"/>
+        <field name="sequenceNumber" id="7"  type="uint64"
+               description="Original feed sequence number"/>
+        <field name="timestampIn"    id="8"  type="NanoTimestamp"
+               description="Nanosecond wall-clock time when message was received"/>
+        <field name="timestampOut"   id="9"  type="NanoTimestamp"
+               description="Nanosecond wall-clock time when processing completed"/>
     </message>
 
 </sbe:messageSchema>

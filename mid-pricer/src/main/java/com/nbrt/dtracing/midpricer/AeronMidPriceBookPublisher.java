@@ -78,7 +78,9 @@ public class AeronMidPriceBookPublisher implements SmartLifecycle {
         return -10;
     }
 
-    public void publish(CcyPair ccyPair, long midPriceMantissa, int midSize) {
+    public void publish(CcyPair ccyPair, long midPriceMantissa, int midSize,
+                        long traceId, long spanId, long sequenceNumber,
+                        com.nbrt.dtracing.common.sbe.Ecn ecn) {
         if (!running) {
             return;
         }
@@ -87,6 +89,10 @@ public class AeronMidPriceBookPublisher implements SmartLifecycle {
         encoder.ccyPair(ccyPair);
         encoder.midPrice().mantissa(midPriceMantissa);
         encoder.midSize(midSize);
+        encoder.traceId(traceId);
+        encoder.spanId(spanId);
+        encoder.sequenceNumber(sequenceNumber);
+        encoder.ecn(ecn);
 
         long result = publication.offer(buffer, 0, BUF_SIZE);
         if (result >= 0) {

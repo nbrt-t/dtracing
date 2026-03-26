@@ -2,6 +2,8 @@ package com.nbrt.dtracing.pricetiering;
 
 import com.nbrt.dtracing.common.sbe.CcyPair;
 import com.nbrt.dtracing.common.sbe.MidPriceBookDecoder;
+import com.nbrt.dtracing.common.sbe.Stage;
+import com.nbrt.dtracing.common.tracing.TracePublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -37,9 +39,11 @@ public class PriceTieringProcessor implements MidPriceBookHandler {
     private final long[][] tieredAskPrices;
     private final int[][] tieredSizes;
 
+    private final TracePublisher tracePublisher;
     private long messageCount;
 
-    public PriceTieringProcessor(SpreadMatrixProperties spreadMatrix) {
+    public PriceTieringProcessor(SpreadMatrixProperties spreadMatrix, TracePublisher tracePublisher) {
+        this.tracePublisher = tracePublisher;
         this.tierCount = spreadMatrix.tierCount();
         this.tieredBidPrices = new long[CCY_PAIR_COUNT][tierCount];
         this.tieredAskPrices = new long[CCY_PAIR_COUNT][tierCount];
@@ -60,12 +64,19 @@ public class PriceTieringProcessor implements MidPriceBookHandler {
 
     @Override
     public void onMidPriceBook(MidPriceBookDecoder decoder) {
+        long timestampIn = TracePublisher.epochNanosNow();
         messageCount++;
 
         var ccyPair = decoder.ccyPair();
         long midMantissa = decoder.midPrice().mantissa();
         int midSize = decoder.midSize();
         int ccyIdx = ccyPair.value();
+
+        // Extract trace context
+        long traceId = decoder.traceId();
+        long parentSpanId = decoder.spanId();
+        long sequenceNumber = decoder.sequenceNumber();
+        var ecn = decoder.ecn();
 
         long[] pairSpreads = halfSpreads[ccyIdx];
 
@@ -75,6 +86,13 @@ public class PriceTieringProcessor implements MidPriceBookHandler {
             tieredAskPrices[ccyIdx][t] = midMantissa + halfSpread;
             tieredSizes[ccyIdx][t] = midSize;
         }
+
+        // Publish terminal trace span
+        long timestampOut = TracePublisher.epochNanosNow();
+        tracePublisher.publishSpan(
+                traceId, parentSpanId, Stage.PRICE_TIER,
+                ecn, ccyPair, sequenceNumber,
+                timestampIn, timestampOut);
 
         log.info("{} mid={} tiers: T1={}/{} T2={}/{} T3={}/{} T4={}/{}  (total={})",
                 ccyPair, midMantissa,

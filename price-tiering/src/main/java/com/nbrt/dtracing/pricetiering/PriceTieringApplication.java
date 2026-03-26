@@ -5,7 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
 @SpringBootApplication
-@EnableConfigurationProperties({AeronSubscriberProperties.class, SpreadMatrixProperties.class})
+@EnableConfigurationProperties({AeronSubscriberProperties.class, SpreadMatrixProperties.class, AeronTraceProperties.class})
 public class PriceTieringApplication {
 
     public static void main(String[] args) {

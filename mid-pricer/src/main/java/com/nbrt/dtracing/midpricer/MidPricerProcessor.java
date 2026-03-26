@@ -2,7 +2,9 @@ package com.nbrt.dtracing.midpricer;
 
 import com.nbrt.dtracing.common.sbe.CcyPair;
 import com.nbrt.dtracing.common.sbe.Ecn;
+import com.nbrt.dtracing.common.sbe.Stage;
 import com.nbrt.dtracing.common.sbe.VenueOrderBookDecoder;
+import com.nbrt.dtracing.common.tracing.TracePublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -36,14 +38,17 @@ public class MidPricerProcessor implements VenueOrderBookHandler {
     private final int[] midSizes = new int[CCY_PAIR_COUNT];
 
     private final AeronMidPriceBookPublisher publisher;
+    private final TracePublisher tracePublisher;
     private long messageCount;
 
-    public MidPricerProcessor(AeronMidPriceBookPublisher publisher) {
+    public MidPricerProcessor(AeronMidPriceBookPublisher publisher, TracePublisher tracePublisher) {
         this.publisher = publisher;
+        this.tracePublisher = tracePublisher;
     }
 
     @Override
     public void onVenueOrderBook(VenueOrderBookDecoder decoder) {
+        long timestampIn = TracePublisher.epochNanosNow();
         messageCount++;
 
         var ecn = decoder.ecn();
@@ -51,6 +56,11 @@ public class MidPricerProcessor implements VenueOrderBookHandler {
         long rateMantissa = decoder.rate().mantissa();
         int bidSize = decoder.bidSize();
         int askSize = decoder.askSize();
+
+        // Extract trace context
+        long traceId = decoder.traceId();
+        long parentSpanId = decoder.spanId();
+        long sequenceNumber = decoder.sequenceNumber();
 
         int ecnIdx = ecn.value();
         int ccyIdx = ccyPair.value();
@@ -93,8 +103,16 @@ public class MidPricerProcessor implements VenueOrderBookHandler {
             midPrices[ccyIdx] = (bestBid + bestAsk) / 2;
             midSizes[ccyIdx] = Math.min(bestBidSize, bestAskSize);
 
-            // Publish to PriceTiering via Aeron IPC
-            publisher.publish(ccyPair, midPrices[ccyIdx], midSizes[ccyIdx]);
+            // Publish trace span
+            long timestampOut = TracePublisher.epochNanosNow();
+            long spanId = tracePublisher.publishSpan(
+                    traceId, parentSpanId, Stage.MID_PRICE,
+                    ecn, ccyPair, sequenceNumber,
+                    timestampIn, timestampOut);
+
+            // Publish to PriceTiering with trace context
+            publisher.publish(ccyPair, midPrices[ccyIdx], midSizes[ccyIdx],
+                    traceId, spanId, sequenceNumber, ecn);
         }
 
         log.info("{} mid={} size={} (bestBid={} bestAsk={})  (total={})",

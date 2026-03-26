@@ -91,7 +91,8 @@ public class AeronFxMarketDataPublisher implements SmartLifecycle {
      */
     public void publish(CcyPair ccyPair, long timestamp,
                         long bidMantissa, int bidSize,
-                        long askMantissa, int askSize) {
+                        long askMantissa, int askSize,
+                        long traceId, long spanId, long sequenceNumber) {
         if (!running) {
             return;
         }
@@ -104,6 +105,9 @@ public class AeronFxMarketDataPublisher implements SmartLifecycle {
         encoder.bidSize(bidSize);
         encoder.askPrice().mantissa(askMantissa);
         encoder.askSize(askSize);
+        encoder.traceId(traceId);
+        encoder.spanId(spanId);
+        encoder.sequenceNumber(sequenceNumber);
 
         long result = publication.offer(buffer, 0, BUF_SIZE);
         if (result >= 0) {
