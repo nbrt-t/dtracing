@@ -36,7 +36,8 @@ public class UdpFeedReceiver implements SmartLifecycle {
     @Override
     public void start() {
         running = true;
-        receiverThread = Thread.ofVirtual()
+        receiverThread = Thread.ofPlatform()
+                .daemon(false)
                 .name("udp-feed-receiver-" + properties.ecn().toLowerCase())
                 .start(this::receiveLoop);
         log.info("UDP feed receiver [{}] starting on {}:{}{}", properties.ecn(),
