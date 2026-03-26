@@ -15,6 +15,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.concurrent.locks.LockSupport;
 
 /**
@@ -53,7 +54,9 @@ public class FeedReplayTask implements Runnable {
                 .schemaId(FxFeedDeltaEncoder.SCHEMA_ID)
                 .version(FxFeedDeltaEncoder.SCHEMA_VERSION);
 
-        long prevTimestamp = -1;
+        long csvBaseTimestamp = -1;
+        long wallBaseNanos = -1;
+        long prevCsvTimestamp = -1;
         int rowCount = 0;
 
         try (var socket = new DatagramSocket();
@@ -76,28 +79,37 @@ public class FeedReplayTask implements Runnable {
 
                 long sequenceNumber = Long.parseUnsignedLong(fields[0].strip());
                 // fields[1] = ecn (used for routing, not encoded)
-                CcyPair ccyPair    = CcyPair.valueOf(fields[2].strip());
-                long timestamp     = Long.parseLong(fields[3].strip());
-                long bidMantissa   = decimalToMantissa(fields[4].strip());
-                int  bidSize       = Integer.parseInt(fields[5].strip());
-                long askMantissa   = decimalToMantissa(fields[6].strip());
-                int  askSize       = Integer.parseInt(fields[7].strip());
+                CcyPair ccyPair       = CcyPair.valueOf(fields[2].strip());
+                long csvTimestamp      = Long.parseLong(fields[3].strip());
+                long bidMantissa      = decimalToMantissa(fields[4].strip());
+                int  bidSize          = Integer.parseInt(fields[5].strip());
+                long askMantissa      = decimalToMantissa(fields[6].strip());
+                int  askSize          = Integer.parseInt(fields[7].strip());
+
+                // Anchor first row to current wall-clock time
+                if (csvBaseTimestamp < 0) {
+                    csvBaseTimestamp = csvTimestamp;
+                    wallBaseNanos = epochNanosNow();
+                }
+
+                // Rebase timestamp: preserve CSV deltas, anchor to wall-clock
+                long rebasedTimestamp = wallBaseNanos + (csvTimestamp - csvBaseTimestamp);
 
                 // Pace: sleep for the timestamp delta scaled by speed multiplier
-                if (prevTimestamp >= 0 && speedMultiplier > 0) {
-                    long deltaNs = timestamp - prevTimestamp;
+                if (prevCsvTimestamp >= 0 && speedMultiplier > 0) {
+                    long deltaNs = csvTimestamp - prevCsvTimestamp;
                     if (deltaNs > 0) {
                         long sleepNs = (long) (deltaNs / speedMultiplier);
                         LockSupport.parkNanos(sleepNs);
                     }
                 }
-                prevTimestamp = timestamp;
+                prevCsvTimestamp = csvTimestamp;
 
                 // Encode SBE message (header already written once, reuse it)
                 deltaEncoder.wrap(directBuffer, MessageHeaderEncoder.ENCODED_LENGTH);
                 deltaEncoder.sequenceNumber(sequenceNumber);
                 deltaEncoder.ccyPair(ccyPair);
-                deltaEncoder.timestamp(timestamp);
+                deltaEncoder.timestamp(rebasedTimestamp);
                 deltaEncoder.askPrice().mantissa(askMantissa);
                 deltaEncoder.askSize(askSize);
                 deltaEncoder.bidPrice().mantissa(bidMantissa);
@@ -112,6 +124,14 @@ public class FeedReplayTask implements Runnable {
         } catch (IOException e) {
             log.error("[{}] I/O error replaying {}", ecn, csvFile, e);
         }
+    }
+
+    /**
+     * Returns current wall-clock time as nanoseconds since Unix epoch.
+     */
+    private static long epochNanosNow() {
+        Instant now = Instant.now();
+        return now.getEpochSecond() * 1_000_000_000L + now.getNano();
     }
 
     /**
