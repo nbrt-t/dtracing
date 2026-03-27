@@ -8,6 +8,8 @@ import com.nbrt.dtracing.common.sbe.TraceSpanEncoder;
 import io.aeron.Aeron;
 import io.aeron.Publication;
 import org.agrona.concurrent.UnsafeBuffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.time.Instant;
@@ -22,6 +24,7 @@ import java.time.Instant;
  */
 public class TracePublisher implements AutoCloseable {
 
+    private static final Logger log = LoggerFactory.getLogger(TracePublisher.class);
     private static final int BUF_SIZE = MessageHeaderEncoder.ENCODED_LENGTH + TraceSpanEncoder.BLOCK_LENGTH;
 
     private final UnsafeBuffer buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(BUF_SIZE));
@@ -72,6 +75,9 @@ public class TracePublisher implements AutoCloseable {
         encoder.sequenceNumber(sequenceNumber);
         encoder.timestampIn(timestampIn);
         encoder.timestampOut(timestampOut);
+
+        log.debug("traceId={} spanId={} parentSpanId={} stage={} ecn={} ccyPair={} seq={} in={} out={}",
+                    traceId, spanId, parentSpanId, stage, ecn, ccyPair, sequenceNumber, timestampIn, timestampOut);
 
         publication.offer(buffer, 0, BUF_SIZE);
         return spanId;
