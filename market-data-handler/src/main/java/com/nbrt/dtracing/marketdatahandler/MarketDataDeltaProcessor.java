@@ -26,6 +26,7 @@ public class MarketDataDeltaProcessor implements MarketDataDeltaHandler {
     private final TracePublisher tracePublisher;
     private long messageCount;
     private long traceIdCounter;
+    private final long traceIdSeed = System.nanoTime();
 
     public MarketDataDeltaProcessor(UdpFeedProperties properties,
                                     AeronFxMarketDataPublisher publisher,
@@ -57,7 +58,7 @@ public class MarketDataDeltaProcessor implements MarketDataDeltaHandler {
         book.updateAsk(askMantissa, askSize);
 
         // Generate trace ID (root span — feed timestamp to receive time)
-        long traceId = ++traceIdCounter;
+        long traceId = traceIdSeed ^ (++traceIdCounter);
         long timestampOut = TracePublisher.epochNanosNow();
 
         long spanId = tracePublisher.publishSpan(
