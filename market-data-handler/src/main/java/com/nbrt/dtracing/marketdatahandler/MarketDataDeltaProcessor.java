@@ -74,7 +74,7 @@ public class MarketDataDeltaProcessor implements MarketDataDeltaHandler {
                 traceId, spanId, sequenceNumber);
 
         //if (log.isDebugEnabled() && messageCount % LOG_SAMPLE_INTERVAL == 0) {
-            log.debug("[{}] {} book: bid={}/{} ask={}/{} depth={}/{} sequence={} (count={})",
+            log.info("[{}] {} book: bid={}/{} ask={}/{} depth={}/{} sequence={} (count={})",
                     ecn, ccyPair,
                     book.bestBid(), book.bidDepth() > 0 ? book.bidSize(0) : 0,
                     book.bestAsk(), book.askDepth() > 0 ? book.askSize(0) : 0,
