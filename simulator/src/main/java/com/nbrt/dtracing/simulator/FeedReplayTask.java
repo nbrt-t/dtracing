@@ -57,7 +57,7 @@ public class FeedReplayTask implements Runnable {
         long csvBaseTimestamp = -1;
         long wallBaseNanos = -1;
         long prevCsvTimestamp = -1;
-        long sequenceCounter = epochNanosNow();
+        long sequenceCounter = epochNanosNow() ^ ((long) ecn.hashCode() << 32);
         int rowCount = 0;
 
         try (var socket = new DatagramSocket();
