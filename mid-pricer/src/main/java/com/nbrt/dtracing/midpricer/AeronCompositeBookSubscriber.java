@@ -1,7 +1,7 @@
 package com.nbrt.dtracing.midpricer;
 
+import com.nbrt.dtracing.common.sbe.CompositeBookSnapshotDecoder;
 import com.nbrt.dtracing.common.sbe.MessageHeaderDecoder;
-import com.nbrt.dtracing.common.sbe.VenueOrderBookDecoder;
 import io.aeron.Aeron;
 import io.aeron.Subscription;
 import org.agrona.DirectBuffer;
@@ -13,23 +13,23 @@ import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
 
 /**
- * Subscribes to {@code VenueOrderBook} messages published by the BookBuilder
+ * Subscribes to {@code CompositeBookSnapshot} messages published by the BookBuilder
  * over Aeron IPC. Polls on a dedicated platform thread.
  */
 @Component
-public class AeronVenueOrderBookSubscriber implements SmartLifecycle {
+public class AeronCompositeBookSubscriber implements SmartLifecycle {
 
-    private static final Logger log = LoggerFactory.getLogger(AeronVenueOrderBookSubscriber.class);
+    private static final Logger log = LoggerFactory.getLogger(AeronCompositeBookSubscriber.class);
 
     private final AeronSubscriberProperties properties;
-    private final VenueOrderBookHandler handler;
+    private final CompositeBookSnapshotHandler handler;
 
     private Aeron aeron;
     private Subscription subscription;
     private Thread pollerThread;
     private volatile boolean running;
 
-    public AeronVenueOrderBookSubscriber(AeronSubscriberProperties properties, VenueOrderBookHandler handler) {
+    public AeronCompositeBookSubscriber(AeronSubscriberProperties properties, CompositeBookSnapshotHandler handler) {
         this.properties = properties;
         this.handler = handler;
     }
@@ -42,10 +42,10 @@ public class AeronVenueOrderBookSubscriber implements SmartLifecycle {
 
         pollerThread = Thread.ofPlatform()
                 .daemon(false)
-                .name("aeron-venue-order-book-subscriber")
+                .name("aeron-composite-book-subscriber")
                 .start(this::pollLoop);
 
-        log.info("Aeron VenueOrderBook subscriber started: channel={} stream={} dir={}",
+        log.info("Aeron CompositeBookSnapshot subscriber started: channel={} stream={} dir={}",
                 properties.channel(), properties.streamId(), properties.dir());
     }
 
@@ -61,7 +61,7 @@ public class AeronVenueOrderBookSubscriber implements SmartLifecycle {
         if (aeron != null) {
             aeron.close();
         }
-        log.info("Aeron VenueOrderBook subscriber stopped");
+        log.info("Aeron CompositeBookSnapshot subscriber stopped");
     }
 
     @Override
@@ -71,26 +71,26 @@ public class AeronVenueOrderBookSubscriber implements SmartLifecycle {
 
     private void pollLoop() {
         var headerDecoder = new MessageHeaderDecoder();
-        var venueOrderBookDecoder = new VenueOrderBookDecoder();
+        var snapshotDecoder = new CompositeBookSnapshotDecoder();
         IdleStrategy idleStrategy = new SleepingMillisIdleStrategy(1);
 
         while (running) {
             int fragmentsRead = subscription.poll((buffer, offset, length, header) ->
-                    onFragment(buffer, offset, headerDecoder, venueOrderBookDecoder), 10);
+                    onFragment(buffer, offset, headerDecoder, snapshotDecoder), 10);
             idleStrategy.idle(fragmentsRead);
         }
     }
 
     private void onFragment(DirectBuffer buffer, int offset,
                             MessageHeaderDecoder headerDecoder,
-                            VenueOrderBookDecoder venueOrderBookDecoder) {
+                            CompositeBookSnapshotDecoder snapshotDecoder) {
         headerDecoder.wrap(buffer, offset);
 
-        if (headerDecoder.templateId() != VenueOrderBookDecoder.TEMPLATE_ID) {
+        if (headerDecoder.templateId() != CompositeBookSnapshotDecoder.TEMPLATE_ID) {
             return;
         }
 
-        venueOrderBookDecoder.wrapAndApplyHeader(buffer, offset, headerDecoder);
-        handler.onVenueOrderBook(venueOrderBookDecoder);
+        snapshotDecoder.wrapAndApplyHeader(buffer, offset, headerDecoder);
+        handler.onCompositeBookSnapshot(snapshotDecoder);
     }
 }

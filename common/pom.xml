@@ -26,6 +26,15 @@
 
     <build>
         <plugins>
+            <!-- Agrona needs access to jdk.internal.misc.Unsafe for DirectBuffer -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED</argLine>
+                </configuration>
+            </plugin>
+
             <!-- Skip Spring Boot repackage — common is a library, not an executable -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>

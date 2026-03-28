@@ -27,7 +27,7 @@
     </modules>
 
     <properties>
-        <java.version>26</java.version>
+        <java.version>21</java.version>
         <aeron.version>1.50.4</aeron.version>
         <!-- agrona is bundled inside aeron-all but declared separately for common -->
         <agrona.version>2.4.0</agrona.version>

@@ -26,7 +26,7 @@ public class OtelTraceExporter implements AutoCloseable {
     private static final AttributeKey<String> ATTR_STAGE = AttributeKey.stringKey("pipeline.stage");
     private static final AttributeKey<String> ATTR_ECN = AttributeKey.stringKey("fx.ecn");
     private static final AttributeKey<String> ATTR_CCY_PAIR = AttributeKey.stringKey("fx.ccyPair");
-    private static final AttributeKey<Long> ATTR_SEQ_NUM = AttributeKey.longKey("fx.sequenceNumber");
+    private static final AttributeKey<String> ATTR_SEQ_NUM = AttributeKey.stringKey("fx.sequenceNumber");
     private static final AttributeKey<Long> ATTR_TRACE_ID = AttributeKey.longKey("pipeline.traceId");
     private static final AttributeKey<Long> ATTR_LATENCY_NS = AttributeKey.longKey("pipeline.latencyNanos");
 
@@ -75,7 +75,7 @@ public class OtelTraceExporter implements AutoCloseable {
                 .put(ATTR_STAGE, stage)
                 .put(ATTR_ECN, ecn)
                 .put(ATTR_CCY_PAIR, ccyPair)
-                .put(ATTR_SEQ_NUM, sequenceNumber)
+                .put(ATTR_SEQ_NUM, Long.toUnsignedString(sequenceNumber))
                 .put(ATTR_TRACE_ID, traceId)
                 .put(ATTR_LATENCY_NS, timestampOut - timestampIn)
                 .build();

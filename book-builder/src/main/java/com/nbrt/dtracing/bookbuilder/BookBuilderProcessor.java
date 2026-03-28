@@ -35,11 +35,11 @@ public class BookBuilderProcessor implements FxMarketDataHandler {
     // Scratch array for passing venue books to rebuild — avoids allocation per call
     private final VenueBook[] venueSlice = new VenueBook[ECN_COUNT];
 
-    private final AeronVenueOrderBookPublisher publisher;
+    private final AeronCompositeBookPublisher publisher;
     private final TracePublisher tracePublisher;
     private long messageCount;
 
-    public BookBuilderProcessor(AeronVenueOrderBookPublisher publisher, TracePublisher tracePublisher) {
+    public BookBuilderProcessor(AeronCompositeBookPublisher publisher, TracePublisher tracePublisher) {
         this.publisher = publisher;
         this.tracePublisher = tracePublisher;
         for (int e = 0; e < ECN_COUNT; e++) {
@@ -88,8 +88,8 @@ public class BookBuilderProcessor implements FxMarketDataHandler {
                 ecn, ccyPair, sequenceNumber,
                 timestampIn, timestampOut);
 
-        // Publish composite levels to MidPricer with trace context
-        publisher.publishComposite(ccyPair, composite, traceId, spanId, sequenceNumber);
+        // Publish venue-level snapshot to MidPricer with trace context
+        publisher.publishSnapshot(ccyPair, venueSlice, ecn, traceId, spanId, sequenceNumber);
 
         log.info("[{}] {} composite: bids={} asks={} bestBid={}/{} bestAsk={}/{}  (total={})",
                 ecn, ccyPair,

@@ -1,39 +1,39 @@
 package com.nbrt.dtracing.midpricer;
 
 import com.nbrt.dtracing.common.sbe.CcyPair;
-import com.nbrt.dtracing.common.sbe.Ecn;
+import com.nbrt.dtracing.common.sbe.CompositeBookSnapshotDecoder;
 import com.nbrt.dtracing.common.sbe.Stage;
-import com.nbrt.dtracing.common.sbe.VenueOrderBookDecoder;
 import com.nbrt.dtracing.common.tracing.TracePublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
- * Receives {@code VenueOrderBook} levels from the BookBuilder and calculates
- * the mid price for each currency pair.
+ * Receives {@code CompositeBookSnapshot} messages from the BookBuilder and
+ * calculates the mid price for each currency pair.
  * <p>
- * Tracks the best bid (highest across all ECNs) and best ask (lowest across
- * all ECNs) per currency pair. Mid = (bestBid + bestAsk) / 2 in Decimal5 mantissa.
+ * Each snapshot carries all 3 venue-level BBOs (positional by ECN ordinal).
+ * The processor finds the best bid (highest) and best ask (lowest) across
+ * venues and computes mid = (bestBid + bestAsk) / 2 in Decimal5 mantissa.
  * <p>
- * Flat arrays indexed by CcyPair ordinal — zero allocation on the hot path.
+ * Stateless with respect to venue data — each snapshot is self-contained.
+ * Flat scratch arrays, zero allocation on the hot path.
  */
 @Service
-public class MidPricerProcessor implements VenueOrderBookHandler {
+public class MidPricerProcessor implements CompositeBookSnapshotHandler {
 
     private static final Logger log = LoggerFactory.getLogger(MidPricerProcessor.class);
 
-    // Excludes SBE NULL_VAL sentinels (value 255)
     private static final int ECN_COUNT = 3;
     private static final int CCY_PAIR_COUNT = 12;
 
-    // Per-venue best bid/ask: [ecn ordinal][ccyPair ordinal]
-    private final long[][] venueBidPrices = new long[ECN_COUNT][CCY_PAIR_COUNT];
-    private final int[][] venueBidSizes = new int[ECN_COUNT][CCY_PAIR_COUNT];
-    private final long[][] venueAskPrices = new long[ECN_COUNT][CCY_PAIR_COUNT];
-    private final int[][] venueAskSizes = new int[ECN_COUNT][CCY_PAIR_COUNT];
+    // Scratch arrays for decoding venue slots — reused per message
+    private final long[] bidPrices = new long[ECN_COUNT];
+    private final int[] bidSizes = new int[ECN_COUNT];
+    private final long[] askPrices = new long[ECN_COUNT];
+    private final int[] askSizes = new int[ECN_COUNT];
 
-    // Computed mid prices: [ccyPair ordinal]
+    // Latest mid prices: [ccyPair ordinal]
     private final long[] midPrices = new long[CCY_PAIR_COUNT];
     private final int[] midSizes = new int[CCY_PAIR_COUNT];
 
@@ -47,50 +47,51 @@ public class MidPricerProcessor implements VenueOrderBookHandler {
     }
 
     @Override
-    public void onVenueOrderBook(VenueOrderBookDecoder decoder) {
+    public void onCompositeBookSnapshot(CompositeBookSnapshotDecoder decoder) {
         long timestampIn = TracePublisher.epochNanosNow();
         messageCount++;
 
-        var ecn = decoder.ecn();
         var ccyPair = decoder.ccyPair();
-        long rateMantissa = decoder.rate().mantissa();
-        int bidSize = decoder.bidSize();
-        int askSize = decoder.askSize();
+        var triggeringEcn = decoder.triggeringEcn();
+        int ccyIdx = ccyPair.value();
 
         // Extract trace context
         long traceId = decoder.traceId();
         long parentSpanId = decoder.spanId();
         long sequenceNumber = decoder.sequenceNumber();
 
-        int ecnIdx = ecn.value();
-        int ccyIdx = ccyPair.value();
+        // Decode all 3 venue slots (positional by ECN ordinal)
+        bidPrices[0] = decoder.venue0BidPrice().mantissa();
+        bidSizes[0]  = decoder.venue0BidSize();
+        askPrices[0] = decoder.venue0AskPrice().mantissa();
+        askSizes[0]  = decoder.venue0AskSize();
 
-        // Update per-venue state based on which side this level represents
-        if (bidSize > 0) {
-            venueBidPrices[ecnIdx][ccyIdx] = rateMantissa;
-            venueBidSizes[ecnIdx][ccyIdx] = bidSize;
-        }
-        if (askSize > 0) {
-            venueAskPrices[ecnIdx][ccyIdx] = rateMantissa;
-            venueAskSizes[ecnIdx][ccyIdx] = askSize;
-        }
+        bidPrices[1] = decoder.venue1BidPrice().mantissa();
+        bidSizes[1]  = decoder.venue1BidSize();
+        askPrices[1] = decoder.venue1AskPrice().mantissa();
+        askSizes[1]  = decoder.venue1AskSize();
 
-        // Recalculate best bid (highest) and best ask (lowest) across all ECNs
+        bidPrices[2] = decoder.venue2BidPrice().mantissa();
+        bidSizes[2]  = decoder.venue2BidSize();
+        askPrices[2] = decoder.venue2AskPrice().mantissa();
+        askSizes[2]  = decoder.venue2AskSize();
+
+        // Find best bid (highest) and best ask (lowest) across all venues
         long bestBid = 0;
         int bestBidSize = 0;
         long bestAsk = Long.MAX_VALUE;
         int bestAskSize = 0;
 
         for (int e = 0; e < ECN_COUNT; e++) {
-            long bp = venueBidPrices[e][ccyIdx];
+            long bp = bidPrices[e];
             if (bp > bestBid) {
                 bestBid = bp;
-                bestBidSize = venueBidSizes[e][ccyIdx];
+                bestBidSize = bidSizes[e];
             }
-            long ap = venueAskPrices[e][ccyIdx];
+            long ap = askPrices[e];
             if (ap > 0 && ap < bestAsk) {
                 bestAsk = ap;
-                bestAskSize = venueAskSizes[e][ccyIdx];
+                bestAskSize = askSizes[e];
             }
         }
 
@@ -103,16 +104,16 @@ public class MidPricerProcessor implements VenueOrderBookHandler {
             midPrices[ccyIdx] = (bestBid + bestAsk) / 2;
             midSizes[ccyIdx] = Math.min(bestBidSize, bestAskSize);
 
-            // Publish trace span
+            // Publish trace span — ecn is the triggering ECN
             long timestampOut = TracePublisher.epochNanosNow();
             long spanId = tracePublisher.publishSpan(
                     traceId, parentSpanId, Stage.MID_PRICE,
-                    ecn, ccyPair, sequenceNumber,
+                    triggeringEcn, ccyPair, sequenceNumber,
                     timestampIn, timestampOut);
 
             // Publish to PriceTiering with trace context
             publisher.publish(ccyPair, midPrices[ccyIdx], midSizes[ccyIdx],
-                    traceId, spanId, sequenceNumber, ecn);
+                    traceId, spanId, sequenceNumber, triggeringEcn);
         }
 
         log.info("{} mid={} size={} (bestBid={} bestAsk={})  (total={})",

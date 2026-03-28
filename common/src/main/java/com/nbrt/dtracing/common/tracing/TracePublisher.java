@@ -34,12 +34,26 @@ public class TracePublisher implements AutoCloseable {
     private final Aeron aeron;
     private final Publication publication;
 
+    /** High bits encode the stage ordinal so span IDs are unique across services. */
+    private final long spanIdPrefix;
     private long spanCounter;
 
-    public TracePublisher(String aeronDir, String channel, int streamId) {
+    public TracePublisher(String aeronDir, String channel, int streamId, Stage stage) {
         this.aeron = Aeron.connect(new Aeron.Context().aeronDirectoryName(aeronDir));
         this.publication = aeron.addPublication(channel, streamId);
+        this.spanIdPrefix = (long) stage.value() << 48;
+        initHeader();
+    }
 
+    /** Package-private for testing — bypasses Aeron connection. */
+    TracePublisher(Aeron aeron, Publication publication, Stage stage) {
+        this.aeron = aeron;
+        this.publication = publication;
+        this.spanIdPrefix = (long) stage.value() << 48;
+        initHeader();
+    }
+
+    private void initHeader() {
         headerEncoder.wrap(buffer, 0)
                 .blockLength(TraceSpanEncoder.BLOCK_LENGTH)
                 .templateId(TraceSpanEncoder.TEMPLATE_ID)
@@ -63,7 +77,7 @@ public class TracePublisher implements AutoCloseable {
     public long publishSpan(long traceId, long parentSpanId, Stage stage,
                             Ecn ecn, CcyPair ccyPair, long sequenceNumber,
                             long timestampIn, long timestampOut) {
-        long spanId = ++spanCounter;
+        long spanId = spanIdPrefix | ++spanCounter;
 
         encoder.wrap(buffer, MessageHeaderEncoder.ENCODED_LENGTH);
         encoder.traceId(traceId);

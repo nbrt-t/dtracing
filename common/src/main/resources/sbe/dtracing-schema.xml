@@ -97,26 +97,46 @@
     </message>
 
     <!-- ════════════════════════════════════════════════════════════════════════
-         Message 2 — VenueOrderBook
-         A single price level in the venue-aggregated order book.
+         Message 2 — CompositeBookSnapshot
+         Full composite book — 3 positional venue slots indexed by ECN ordinal.
+         Slot 0 = EURONEXT, Slot 1 = EBS, Slot 2 = FENICS.
+         Zero bid/ask price means no data for that venue.
          ════════════════════════════════════════════════════════════════════════ -->
-    <message name="VenueOrderBook" id="2"
-             description="Price level in the venue order book">
-        <field name="ecn"            id="1"  type="Ecn"
-               description="Venue / ECN that owns this level"/>
-        <field name="ccyPair"        id="2"  type="CcyPair"
+    <message name="CompositeBookSnapshot" id="2"
+             description="Full composite book snapshot — 3 positional venue slots indexed by ECN ordinal">
+        <field name="ccyPair"         id="1"  type="CcyPair"
                description="Currency pair"/>
-        <field name="rate"           id="3"  type="Decimal5"
-               description="Price level rate (5 d.p.)"/>
-        <field name="askSize"        id="4"  type="int32"
-               description="Ask quantity at this level"/>
-        <field name="bidSize"        id="5"  type="int32"
-               description="Bid quantity at this level"/>
-        <field name="traceId"        id="6"  type="uint64"
+        <field name="triggeringEcn"   id="2"  type="Ecn"
+               description="ECN whose tick caused this rebuild"/>
+        <field name="venue0BidPrice"  id="3"  type="Decimal5"
+               description="EURONEXT bid price"/>
+        <field name="venue0BidSize"   id="4"  type="int32"
+               description="EURONEXT bid size"/>
+        <field name="venue0AskPrice"  id="5"  type="Decimal5"
+               description="EURONEXT ask price"/>
+        <field name="venue0AskSize"   id="6"  type="int32"
+               description="EURONEXT ask size"/>
+        <field name="venue1BidPrice"  id="7"  type="Decimal5"
+               description="EBS bid price"/>
+        <field name="venue1BidSize"   id="8"  type="int32"
+               description="EBS bid size"/>
+        <field name="venue1AskPrice"  id="9"  type="Decimal5"
+               description="EBS ask price"/>
+        <field name="venue1AskSize"   id="10" type="int32"
+               description="EBS ask size"/>
+        <field name="venue2BidPrice"  id="11" type="Decimal5"
+               description="FENICS bid price"/>
+        <field name="venue2BidSize"   id="12" type="int32"
+               description="FENICS bid size"/>
+        <field name="venue2AskPrice"  id="13" type="Decimal5"
+               description="FENICS ask price"/>
+        <field name="venue2AskSize"   id="14" type="int32"
+               description="FENICS ask size"/>
+        <field name="traceId"         id="15" type="uint64"
                description="Trace ID — correlates spans across pipeline stages"/>
-        <field name="spanId"         id="7"  type="uint64"
+        <field name="spanId"          id="16" type="uint64"
                description="Span ID created by the publishing stage"/>
-        <field name="sequenceNumber" id="8"  type="uint64"
+        <field name="sequenceNumber"  id="17" type="uint64"
                description="Original feed sequence number"/>
     </message>
 
