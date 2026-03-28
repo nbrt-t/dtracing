@@ -122,11 +122,13 @@ public class MidPricerProcessor implements CompositeBookSnapshotHandler {
                     traceId, spanId, sequenceNumber, triggeringEcn, timestampOut);
         }
 
-        log.info("{} mid={} size={} (bestBid={} bestAsk={})  (total={})",
-                ccyPair,
-                midPrices[ccyIdx], midSizes[ccyIdx],
-                bestBid, bestAsk,
-                messageCount);
+        if (log.isDebugEnabled()) {
+            log.debug("{} mid={} size={} (bestBid={} bestAsk={})  (total={})",
+                    ccyPair,
+                    midPrices[ccyIdx], midSizes[ccyIdx],
+                    bestBid, bestAsk,
+                    messageCount);
+        }
     }
 
     public long getMidPrice(CcyPair ccyPair) {

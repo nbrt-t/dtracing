@@ -100,13 +100,15 @@ public class PriceTieringProcessor implements MidPriceBookHandler {
                 ecn, ccyPair, sequenceNumber,
                 timestampIn, timestampOut);
 
-        log.info("{} mid={} tiers: T1={}/{} T2={}/{} T3={}/{} T4={}/{}  (total={})",
-                ccyPair, midMantissa,
-                tieredBidPrices[ccyIdx][0], tieredAskPrices[ccyIdx][0],
-                tieredBidPrices[ccyIdx][1], tieredAskPrices[ccyIdx][1],
-                tieredBidPrices[ccyIdx][2], tieredAskPrices[ccyIdx][2],
-                tieredBidPrices[ccyIdx][3], tieredAskPrices[ccyIdx][3],
-                messageCount);
+        if (log.isDebugEnabled()) {
+            log.debug("{} mid={} tiers: T1={}/{} T2={}/{} T3={}/{} T4={}/{}  (total={})",
+                    ccyPair, midMantissa,
+                    tieredBidPrices[ccyIdx][0], tieredAskPrices[ccyIdx][0],
+                    tieredBidPrices[ccyIdx][1], tieredAskPrices[ccyIdx][1],
+                    tieredBidPrices[ccyIdx][2], tieredAskPrices[ccyIdx][2],
+                    tieredBidPrices[ccyIdx][3], tieredAskPrices[ccyIdx][3],
+                    messageCount);
+        }
     }
 
     public long getTieredBidPrice(CcyPair ccyPair, int tier) {

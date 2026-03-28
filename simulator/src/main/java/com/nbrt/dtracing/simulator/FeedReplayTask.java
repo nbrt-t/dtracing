@@ -118,9 +118,11 @@ public class FeedReplayTask implements Runnable {
 
                 socket.send(packet);
                 rowCount++;
-                log.info("[{}] seq={} {} bid={}/{} ask={}/{} ts={}",
-                        ecn, sequenceCounter, ccyPair,
-                        bidMantissa, bidSize, askMantissa, askSize, rebasedTimestamp);
+                if (log.isDebugEnabled()) {
+                    log.debug("[{}] seq={} {} bid={}/{} ask={}/{} ts={}",
+                            ecn, sequenceCounter, ccyPair,
+                            bidMantissa, bidSize, askMantissa, askSize, rebasedTimestamp);
+                }
             }
 
             log.info("[{}] Replay complete — {} datagrams sent to {}", ecn, rowCount, target);

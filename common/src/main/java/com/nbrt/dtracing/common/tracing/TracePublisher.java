@@ -90,8 +90,10 @@ public class TracePublisher implements AutoCloseable {
         encoder.timestampIn(timestampIn);
         encoder.timestampOut(timestampOut);
 
-        log.info("traceId={} spanId={} parentSpanId={} stage={} ecn={} ccyPair={} seq={} in={} out={}",
+        if (log.isDebugEnabled()) {
+            log.debug("traceId={} spanId={} parentSpanId={} stage={} ecn={} ccyPair={} seq={} in={} out={}",
                     traceId, spanId, parentSpanId, stage, ecn, ccyPair, sequenceNumber, timestampIn, timestampOut);
+        }
 
         publication.offer(buffer, 0, BUF_SIZE);
         return spanId;

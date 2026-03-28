@@ -78,15 +78,15 @@ public class MarketDataDeltaProcessor implements MarketDataDeltaHandler {
                 book.askDepth() > 0 ? book.askSize(0) : 0,
                 traceId, spanId, sequenceNumber, timestampOut);
 
-        //if (log.isDebugEnabled() && messageCount % LOG_SAMPLE_INTERVAL == 0) {
-            log.info("[{}] {} book: bid={}/{} ask={}/{} depth={}/{} sequence={} (count={})",
+        if (log.isDebugEnabled() && messageCount % LOG_SAMPLE_INTERVAL == 0) {
+            log.debug("[{}] {} book: bid={}/{} ask={}/{} depth={}/{} sequence={} (count={})",
                     ecn, ccyPair,
                     book.bestBid(), book.bidDepth() > 0 ? book.bidSize(0) : 0,
                     book.bestAsk(), book.askDepth() > 0 ? book.askSize(0) : 0,
                     book.bidDepth(), book.askDepth(),
                     sequenceNumber,
                     messageCount);
-        //}
+        }
     }
 
     public OrderBook getBook(CcyPair ccyPair) {

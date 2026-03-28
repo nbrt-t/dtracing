@@ -97,12 +97,14 @@ public class BookBuilderProcessor implements FxMarketDataHandler {
         // Publish venue-level snapshot to MidPricer with trace context
         publisher.publishSnapshot(ccyPair, venueSlice, ecn, traceId, spanId, sequenceNumber, timestampOut);
 
-        log.info("[{}] {} composite: bids={} asks={} bestBid={}/{} bestAsk={}/{}  (total={})",
-                ecn, ccyPair,
-                composite.bidDepth(), composite.askDepth(),
-                composite.bestBid(), composite.bidDepth() > 0 ? composite.bidEcn(0) : "-",
-                composite.bestAsk(), composite.askDepth() > 0 ? composite.bestAskEcn() : "-",
-                messageCount);
+        if (log.isDebugEnabled()) {
+            log.debug("[{}] {} composite: bids={} asks={} bestBid={}/{} bestAsk={}/{}  (total={})",
+                    ecn, ccyPair,
+                    composite.bidDepth(), composite.askDepth(),
+                    composite.bestBid(), composite.bidDepth() > 0 ? composite.bidEcn(0) : "-",
+                    composite.bestAsk(), composite.askDepth() > 0 ? composite.bestAskEcn() : "-",
+                    messageCount);
+        }
     }
 
     public CompositeBook getCompositeBook(CcyPair ccyPair) {
