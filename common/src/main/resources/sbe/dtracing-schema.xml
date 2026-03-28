@@ -60,10 +60,12 @@
         <!-- ── Pipeline stage (for distributed tracing) ───────────────────── -->
         <enum name="Stage" encodingType="uint8"
               description="Processing stage in the pricing pipeline">
-            <validValue name="MDH_RECEIVE"  description="Market data handler — UDP receive + decode">0</validValue>
+            <validValue name="MDH_RECEIVE"  description="Market data handler — exchange publish to UDP receive">0</validValue>
             <validValue name="BOOK_BUILD"   description="Book builder — composite book rebuild">1</validValue>
             <validValue name="MID_PRICE"    description="Mid pricer — mid price calculation">2</validValue>
             <validValue name="PRICE_TIER"   description="Price tiering — spread application">3</validValue>
+            <validValue name="MDH_PROCESS"  description="Market data handler — internal processing (decode, book update, publish)">4</validValue>
+            <validValue name="TRANSPORT"    description="Aeron message transport between pipeline stages">5</validValue>
         </enum>
 
     </types>
@@ -94,6 +96,8 @@
                description="Span ID created by the publishing stage"/>
         <field name="sequenceNumber" id="10" type="uint64"
                description="Original feed sequence number"/>
+        <field name="senderTimestampOut" id="11" type="NanoTimestamp"
+               description="Wall-clock nanoseconds when the publishing stage finished processing"/>
     </message>
 
     <!-- ════════════════════════════════════════════════════════════════════════
@@ -138,6 +142,8 @@
                description="Span ID created by the publishing stage"/>
         <field name="sequenceNumber"  id="17" type="uint64"
                description="Original feed sequence number"/>
+        <field name="senderTimestampOut" id="18" type="NanoTimestamp"
+               description="Wall-clock nanoseconds when the publishing stage finished processing"/>
     </message>
 
     <!-- ════════════════════════════════════════════════════════════════════════
@@ -160,6 +166,8 @@
                description="Original feed sequence number"/>
         <field name="ecn"            id="7"  type="Ecn"
                description="Source ECN (carried for tracing context)"/>
+        <field name="senderTimestampOut" id="8" type="NanoTimestamp"
+               description="Wall-clock nanoseconds when the publishing stage finished processing"/>
     </message>
 
     <!-- ════════════════════════════════════════════════════════════════════════

@@ -87,10 +87,16 @@ public class PriceTieringProcessor implements MidPriceBookHandler {
             tieredSizes[ccyIdx][t] = midSize;
         }
 
+        // Transport span: Aeron transit from MID_PRICE to here
+        long transportSpanId = tracePublisher.publishSpan(
+                traceId, parentSpanId, Stage.TRANSPORT,
+                ecn, ccyPair, sequenceNumber,
+                decoder.senderTimestampOut(), timestampIn);
+
         // Publish terminal trace span
         long timestampOut = TracePublisher.epochNanosNow();
         tracePublisher.publishSpan(
-                traceId, parentSpanId, Stage.PRICE_TIER,
+                traceId, transportSpanId, Stage.PRICE_TIER,
                 ecn, ccyPair, sequenceNumber,
                 timestampIn, timestampOut);
 

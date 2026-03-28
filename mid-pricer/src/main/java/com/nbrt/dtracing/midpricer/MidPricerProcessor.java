@@ -104,16 +104,22 @@ public class MidPricerProcessor implements CompositeBookSnapshotHandler {
             midPrices[ccyIdx] = (bestBid + bestAsk) / 2;
             midSizes[ccyIdx] = Math.min(bestBidSize, bestAskSize);
 
+            // Transport span: Aeron transit from BOOK_BUILD to here
+            long transportSpanId = tracePublisher.publishSpan(
+                    traceId, parentSpanId, Stage.TRANSPORT,
+                    triggeringEcn, ccyPair, sequenceNumber,
+                    decoder.senderTimestampOut(), timestampIn);
+
             // Publish trace span — ecn is the triggering ECN
             long timestampOut = TracePublisher.epochNanosNow();
             long spanId = tracePublisher.publishSpan(
-                    traceId, parentSpanId, Stage.MID_PRICE,
+                    traceId, transportSpanId, Stage.MID_PRICE,
                     triggeringEcn, ccyPair, sequenceNumber,
                     timestampIn, timestampOut);
 
             // Publish to PriceTiering with trace context
             publisher.publish(ccyPair, midPrices[ccyIdx], midSizes[ccyIdx],
-                    traceId, spanId, sequenceNumber, triggeringEcn);
+                    traceId, spanId, sequenceNumber, triggeringEcn, timestampOut);
         }
 
         log.info("{} mid={} size={} (bestBid={} bestAsk={})  (total={})",

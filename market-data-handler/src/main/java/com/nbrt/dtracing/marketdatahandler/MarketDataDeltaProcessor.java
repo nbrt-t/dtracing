@@ -57,21 +57,26 @@ public class MarketDataDeltaProcessor implements MarketDataDeltaHandler {
         book.updateBid(bidMantissa, bidSize);
         book.updateAsk(askMantissa, askSize);
 
-        // Generate trace ID (root span — feed timestamp to receive time)
+        // Span 1: exchange publish → UDP receive (root span)
         long traceId = traceIdSeed ^ (++traceIdCounter);
-        long timestampOut = TracePublisher.epochNanosNow();
-
-        long spanId = tracePublisher.publishSpan(
+        long receiveSpanId = tracePublisher.publishSpan(
                 traceId, 0, Stage.MDH_RECEIVE,
                 ecnEnum, ccyPair, sequenceNumber,
-                feedTimestamp, timestampOut);
+                feedTimestamp, timestampIn);
+
+        // Span 2: internal processing — decode, book update, Aeron publish
+        long timestampOut = TracePublisher.epochNanosNow();
+        long spanId = tracePublisher.publishSpan(
+                traceId, receiveSpanId, Stage.MDH_PROCESS,
+                ecnEnum, ccyPair, sequenceNumber,
+                timestampIn, timestampOut);
 
         // Publish current BBO to BookBuilder with trace context
         publisher.publish(ccyPair, feedTimestamp, book.bestBid(),
                 book.bidDepth() > 0 ? book.bidSize(0) : 0,
                 book.bestAsk(),
                 book.askDepth() > 0 ? book.askSize(0) : 0,
-                traceId, spanId, sequenceNumber);
+                traceId, spanId, sequenceNumber, timestampOut);
 
         //if (log.isDebugEnabled() && messageCount % LOG_SAMPLE_INTERVAL == 0) {
             log.info("[{}] {} book: bid={}/{} ask={}/{} depth={}/{} sequence={} (count={})",

@@ -81,15 +81,21 @@ public class BookBuilderProcessor implements FxMarketDataHandler {
         var composite = compositeBooks[ccyIdx];
         composite.rebuild(venueSlice);
 
+        // Transport span: Aeron transit from MDH_PROCESS to here
+        long transportSpanId = tracePublisher.publishSpan(
+                traceId, parentSpanId, Stage.TRANSPORT,
+                ecn, ccyPair, sequenceNumber,
+                decoder.senderTimestampOut(), timestampIn);
+
         // Publish trace span
         long timestampOut = TracePublisher.epochNanosNow();
         long spanId = tracePublisher.publishSpan(
-                traceId, parentSpanId, Stage.BOOK_BUILD,
+                traceId, transportSpanId, Stage.BOOK_BUILD,
                 ecn, ccyPair, sequenceNumber,
                 timestampIn, timestampOut);
 
         // Publish venue-level snapshot to MidPricer with trace context
-        publisher.publishSnapshot(ccyPair, venueSlice, ecn, traceId, spanId, sequenceNumber);
+        publisher.publishSnapshot(ccyPair, venueSlice, ecn, traceId, spanId, sequenceNumber, timestampOut);
 
         log.info("[{}] {} composite: bids={} asks={} bestBid={}/{} bestAsk={}/{}  (total={})",
                 ecn, ccyPair,

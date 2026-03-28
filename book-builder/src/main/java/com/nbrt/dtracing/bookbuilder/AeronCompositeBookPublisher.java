@@ -88,7 +88,7 @@ public class AeronCompositeBookPublisher implements SmartLifecycle {
      * Each venue slot is positional: index 0 = EURONEXT, 1 = EBS, 2 = FENICS.
      */
     public void publishSnapshot(CcyPair ccyPair, VenueBook[] venues, Ecn triggeringEcn,
-                                long traceId, long spanId, long sequenceNumber) {
+                                long traceId, long spanId, long sequenceNumber, long senderTimestampOut) {
         if (!running) {
             return;
         }
@@ -118,6 +118,7 @@ public class AeronCompositeBookPublisher implements SmartLifecycle {
         encoder.traceId(traceId);
         encoder.spanId(spanId);
         encoder.sequenceNumber(sequenceNumber);
+        encoder.senderTimestampOut(senderTimestampOut);
 
         long result = publication.offer(buffer, 0, BUF_SIZE);
         if (result >= 0) {
