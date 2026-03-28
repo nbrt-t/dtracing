@@ -505,6 +505,15 @@ Aeron transport:   ~2.5ms  (3 × TRANSPORT spans)
 
 Legend:  ███ MDH_RECEIVE  ▓ MDH_PROCESS  ▒ TRANSPORT  ░ processing spans
 ```
+### Example Grafana screenshots
+
+Waterfall diagram of a market data tick flowing through the system
+
+![alt text](images/grafana_trace.png)
+
+Context of the span
+
+![alt text](images/trace_context.png)
 
 ### OTel span attributes
 
