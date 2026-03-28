@@ -62,7 +62,9 @@ The full environment â€” pipeline services, observability stack, and simulator â
 
 ```bash
 make up                # build images and start everything (pipeline + Tempo/Grafana/Prometheus)
+make up-debug          # same as above but with DEBUG logging enabled
 make simulate          # start the simulator (replays feed data into the running pipeline)
+make simulate-fast     # run simulator at max speed (1000x)
 make down              # stop all services
 make logs              # tail logs from all containers
 make logs-euronext     # tail logs for a single MDH instance
