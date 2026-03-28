@@ -9,7 +9,7 @@ export PROMETHEUS_PORT ?= 9090
 
 .PHONY: build clean compile test package \
         docker-build up up-debug down restart logs \
-        infra infra-down \
+        infra infra-down clean-traces \
         simulate simulate-fast \
         status help
 
@@ -42,13 +42,13 @@ docker-build: ## Build all Docker images
 	$(DC_SIM) build
 
 up: ## Start all market-data-handler instances (detached)
-	$(DC) up --build -d
+	$(DC) up --build -d --remove-orphans
 
 up-debug: ## Start all instances with DEBUG logging
-	LOGGING_LEVEL_ROOT=DEBUG $(DC) up --build -d
+	LOGGING_LEVEL_ROOT=DEBUG $(DC) up --build -d --remove-orphans
 
 down: ## Stop all market-data-handler instances
-	$(DC) down
+	$(DC) down --remove-orphans
 
 restart: down up ## Restart all handlers
 
@@ -61,11 +61,16 @@ logs-%: ## Tail logs for one handler (e.g. make logs-euronext)
 # ── Observability ──────────────────────────────────────────────────────────
 
 infra: ## Start only observability stack (Tempo, Grafana, Prometheus)
-	$(DC) up -d tempo grafana prometheus
+	$(DC) up -d --remove-orphans tempo grafana prometheus
 
 infra-down: ## Stop only observability stack
 	$(DC) stop tempo grafana prometheus
 	$(DC) rm -f tempo grafana prometheus
+
+clean-traces: ## Delete all stored traces and Grafana data
+	$(DC) stop tempo grafana
+	docker volume rm -f dtracing_tempo-data dtracing_grafana-data
+	@echo "Trace and Grafana data cleared. Run 'make infra' or 'make up' to restart."
 
 # ── Simulator ───────────────────────────────────────────────────────────────
 
