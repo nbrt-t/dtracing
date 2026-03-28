@@ -19,6 +19,7 @@ services:
     ipc: service:aeron-media-driver
     environment:
       SPRING_PROFILES_ACTIVE: euronext
+      LOGGING_LEVEL_ROOT: ${LOGGING_LEVEL_ROOT:-INFO}
     volumes:
       - aeron-dir:/dev/shm/aeron
     ports:
@@ -37,6 +38,7 @@ services:
     ipc: service:aeron-media-driver
     environment:
       SPRING_PROFILES_ACTIVE: ebs
+      LOGGING_LEVEL_ROOT: ${LOGGING_LEVEL_ROOT:-INFO}
     volumes:
       - aeron-dir:/dev/shm/aeron
     ports:
@@ -55,6 +57,7 @@ services:
     ipc: service:aeron-media-driver
     environment:
       SPRING_PROFILES_ACTIVE: fenics
+      LOGGING_LEVEL_ROOT: ${LOGGING_LEVEL_ROOT:-INFO}
     volumes:
       - aeron-dir:/dev/shm/aeron
     ports:
@@ -71,6 +74,8 @@ services:
       target: book-builder
     container_name: book-builder
     ipc: service:aeron-media-driver
+    environment:
+      LOGGING_LEVEL_ROOT: ${LOGGING_LEVEL_ROOT:-INFO}
     volumes:
       - aeron-dir:/dev/shm/aeron
     ports:
@@ -89,6 +94,8 @@ services:
       target: mid-pricer
     container_name: mid-pricer
     ipc: service:aeron-media-driver
+    environment:
+      LOGGING_LEVEL_ROOT: ${LOGGING_LEVEL_ROOT:-INFO}
     volumes:
       - aeron-dir:/dev/shm/aeron
     ports:
@@ -105,6 +112,8 @@ services:
       target: price-tiering
     container_name: price-tiering
     ipc: service:aeron-media-driver
+    environment:
+      LOGGING_LEVEL_ROOT: ${LOGGING_LEVEL_ROOT:-INFO}
     volumes:
       - aeron-dir:/dev/shm/aeron
     ports:
@@ -124,6 +133,7 @@ services:
     environment:
       JAVA_TOOL_OPTIONS: >-
         -Dotlp.endpoint=http://tempo:4317
+      LOGGING_LEVEL_ROOT: ${LOGGING_LEVEL_ROOT:-INFO}
     volumes:
       - aeron-dir:/dev/shm/aeron
     networks:

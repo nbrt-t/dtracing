@@ -4,7 +4,7 @@ DC    := docker compose
 DC_SIM := docker compose -f docker-compose.simulator.yml
 
 .PHONY: build clean compile test package \
-        docker-build up down restart logs \
+        docker-build up up-debug down restart logs \
         infra infra-down \
         simulate simulate-fast \
         status help
@@ -39,6 +39,9 @@ docker-build: ## Build all Docker images
 
 up: ## Start all market-data-handler instances (detached)
 	$(DC) up --build -d
+
+up-debug: ## Start all instances with DEBUG logging
+	LOGGING_LEVEL_ROOT=DEBUG $(DC) up --build -d
 
 down: ## Stop all market-data-handler instances
 	$(DC) down
