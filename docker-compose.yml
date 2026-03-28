@@ -168,7 +168,7 @@ services:
       - grafana-data:/var/lib/grafana
       - ./grafana-tempo/provisioning:/etc/grafana/provisioning
     ports:
-      - "3001:3000"
+      - "${GRAFANA_PORT:-3001}:3000"
     depends_on:
       - tempo
     networks:
@@ -182,7 +182,7 @@ services:
     volumes:
       - ./grafana-tempo/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
-      - "9090:9090"
+      - "${PROMETHEUS_PORT:-9090}:9090"
     networks:
       - dtracing
 

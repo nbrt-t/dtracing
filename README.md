@@ -78,6 +78,14 @@ make infra             # start only Tempo, Grafana, and Prometheus
 make infra-down        # stop only the observability stack
 ```
 
+### Port overrides
+
+Grafana and Prometheus host ports can be overridden to avoid clashes:
+
+```bash
+make up GRAFANA_PORT=3002 PROMETHEUS_PORT=9091
+```
+
 ### Services and ports
 
 | Service | Port | Description |

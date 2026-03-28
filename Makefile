@@ -3,6 +3,10 @@ MVN   := ./mvnw
 DC    := docker compose
 DC_SIM := docker compose -f docker-compose.simulator.yml
 
+# Overridable ports (e.g. make infra GRAFANA_PORT=3002)
+export GRAFANA_PORT    ?= 3001
+export PROMETHEUS_PORT ?= 9090
+
 .PHONY: build clean compile test package \
         docker-build up up-debug down restart logs \
         infra infra-down \
