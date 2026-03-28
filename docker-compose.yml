@@ -128,9 +128,53 @@ services:
       - aeron-dir:/dev/shm/aeron
     networks:
       - dtracing
-      - tracing
     depends_on:
       - aeron-media-driver
+      - tempo
+
+  # ── Observability ──────────────────────────────────────────────────────────
+
+  tempo:
+    image: grafana/tempo:2.10.0
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./grafana-tempo/tempo.yaml:/etc/tempo.yaml
+      - tempo-data:/var/tempo
+    ports:
+      - "3200:3200"   # Tempo HTTP API
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "14268:14268" # Jaeger HTTP
+    networks:
+      - dtracing
+
+  grafana:
+    image: grafana/grafana:latest
+    user: "472"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana-tempo/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3001:3000"
+    depends_on:
+      - tempo
+    networks:
+      - dtracing
+
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-remote-write-receiver
+    volumes:
+      - ./grafana-tempo/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - dtracing
 
 volumes:
   aeron-dir:
@@ -139,10 +183,9 @@ volumes:
       type: tmpfs
       device: tmpfs
       o: size=64m
+  tempo-data:
+  grafana-data:
 
 networks:
   dtracing:
     name: dtracing
-  tracing:
-    name: grafana-tempo_tracing
-    external: true

@@ -5,6 +5,7 @@ DC_SIM := docker compose -f docker-compose.simulator.yml
 
 .PHONY: build clean compile test package \
         docker-build up down restart logs \
+        infra infra-down \
         simulate simulate-fast \
         status help
 
@@ -49,6 +50,15 @@ logs: ## Tail logs from all handlers
 
 logs-%: ## Tail logs for one handler (e.g. make logs-euronext)
 	$(DC) logs -f mdh-$*
+
+# ── Observability ──────────────────────────────────────────────────────────
+
+infra: ## Start only observability stack (Tempo, Grafana, Prometheus)
+	$(DC) up -d tempo grafana prometheus
+
+infra-down: ## Stop only observability stack
+	$(DC) stop tempo grafana prometheus
+	$(DC) rm -f tempo grafana prometheus
 
 # ── Simulator ───────────────────────────────────────────────────────────────
 
