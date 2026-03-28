@@ -1,5 +1,5 @@
 # ── Builder stage: full Maven build ─────────────────────────────────────────
-FROM azul/zulu-openjdk:26 AS builder
+FROM azul/zulu-openjdk:25 AS builder
 WORKDIR /build
 
 # Cache Maven wrapper + dependencies first
@@ -27,7 +27,7 @@ COPY simulator/           simulator/
 RUN ./mvnw -B clean package -DskipTests -q
 
 # ── aeron-media-driver runtime ─────────────────────────────────────────────
-FROM azul/zulu-openjdk:26-jre AS aeron-media-driver
+FROM azul/zulu-openjdk:25-jre AS aeron-media-driver
 WORKDIR /app
 COPY --from=builder /build/aeron-media-driver/target/*.jar app.jar
 ENTRYPOINT ["java", \
@@ -36,31 +36,31 @@ ENTRYPOINT ["java", \
     "-jar", "app.jar"]
 
 # ── market-data-handler runtime ─────────────────────────────────────────────
-FROM azul/zulu-openjdk:26-jre AS market-data-handler
+FROM azul/zulu-openjdk:25-jre AS market-data-handler
 WORKDIR /app
 COPY --from=builder /build/market-data-handler/target/*.jar app.jar
 ENTRYPOINT ["java", "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED", "-jar", "app.jar"]
 
 # ── book-builder runtime ──────────────────────────────────────────────────
-FROM azul/zulu-openjdk:26-jre AS book-builder
+FROM azul/zulu-openjdk:25-jre AS book-builder
 WORKDIR /app
 COPY --from=builder /build/book-builder/target/*.jar app.jar
 ENTRYPOINT ["java", "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED", "-jar", "app.jar"]
 
 # ── mid-pricer runtime ────────────────────────────────────────────────────
-FROM azul/zulu-openjdk:26-jre AS mid-pricer
+FROM azul/zulu-openjdk:25-jre AS mid-pricer
 WORKDIR /app
 COPY --from=builder /build/mid-pricer/target/*.jar app.jar
 ENTRYPOINT ["java", "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED", "-jar", "app.jar"]
 
 # ── price-tiering runtime ─────────────────────────────────────────────────
-FROM azul/zulu-openjdk:26-jre AS price-tiering
+FROM azul/zulu-openjdk:25-jre AS price-tiering
 WORKDIR /app
 COPY --from=builder /build/price-tiering/target/*.jar app.jar
 ENTRYPOINT ["java", "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED", "-jar", "app.jar"]
 
 # ── trace-collector runtime ───────────────────────────────────────────────
-FROM azul/zulu-openjdk:26-jre AS trace-collector
+FROM azul/zulu-openjdk:25-jre AS trace-collector
 WORKDIR /app
 COPY --from=builder /build/trace-collector/target/*.jar app.jar
 ENTRYPOINT ["java", \
@@ -69,7 +69,7 @@ ENTRYPOINT ["java", \
     "-jar", "app.jar"]
 
 # ── simulator runtime ──────────────────────────────────────────────────────
-FROM azul/zulu-openjdk:26-jre AS simulator
+FROM azul/zulu-openjdk:25-jre AS simulator
 WORKDIR /app
 COPY --from=builder /build/simulator/target/*.jar app.jar
 COPY simulator/data/ data/

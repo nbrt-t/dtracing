@@ -39,7 +39,7 @@ Each tick produces 8 spans (one distributed trace). See [ARCHITECTURE.md](ARCHIT
 
 ## Tech
 
-- **Java 21**, Spring Boot 4.0.4, Maven multi-module
+- **Java 25**, Spring Boot 4.0.4, Maven multi-module
 - **Aeron** (IPC) for inter-stage messaging
 - **SBE** (Simple Binary Encoding) for zero-copy wire format
 - **Agrona** `UnsafeBuffer` for off-heap, allocation-free encoding

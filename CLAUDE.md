@@ -14,7 +14,7 @@ SBE codecs are generated during `generate-sources` phase in the `common` module 
 
 ## Architecture
 
-This is an FX pricing pipeline built as a Maven multi-module Spring Boot 4.0.4 project (Java 26). Data flows through 4 stages connected by Aeron messaging, with SBE (Simple Binary Encoding) as the wire format throughout.
+This is an FX pricing pipeline built as a Maven multi-module Spring Boot 4.0.4 project (Java 25). Data flows through 4 stages connected by Aeron messaging, with SBE (Simple Binary Encoding) as the wire format throughout.
 
 ### Data flow
 
