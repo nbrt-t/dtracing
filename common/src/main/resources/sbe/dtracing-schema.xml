@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sbe:messageSchema xmlns:sbe="http://fixprotocol.io/2016/sbe"
-                   package="com.nbrt.dtracing.common.sbe"
+                   package="com.etradingpoc.dtracing.common.sbe"
                    id="1"
                    version="1"
                    semanticVersion="5.2"
