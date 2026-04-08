@@ -3,15 +3,13 @@ package com.etradingpoc.dtracing.simulator;
 import com.etradingpoc.dtracing.common.sbe.CcyPair;
 import com.etradingpoc.dtracing.common.sbe.FxFeedDeltaEncoder;
 import com.etradingpoc.dtracing.common.sbe.MessageHeaderEncoder;
+import io.aeron.Publication;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,8 +17,7 @@ import java.time.Instant;
 import java.util.concurrent.locks.LockSupport;
 
 /**
- * Replays a single ECN CSV file to its target market-data-handler UDP port.
- * Each row is SBE-encoded as an {@code FxFeedDelta} message and sent as one datagram.
+ * Replays a single ECN CSV file as {@code FxFeedDelta} SBE messages over Aeron IPC.
  * Pacing honours the timestamp deltas between rows, scaled by {@code speedMultiplier}.
  */
 public class FeedReplayTask implements Runnable {
@@ -28,23 +25,23 @@ public class FeedReplayTask implements Runnable {
     private static final Logger log = LoggerFactory.getLogger(FeedReplayTask.class);
 
     private static final int BUF_SIZE = MessageHeaderEncoder.ENCODED_LENGTH + FxFeedDeltaEncoder.BLOCK_LENGTH;
+    private static final long LOG_SAMPLE_INTERVAL = 10_000;
 
     private final String ecn;
     private final Path csvFile;
-    private final InetSocketAddress target;
+    private final Publication publication;
     private final double speedMultiplier;
 
-    public FeedReplayTask(String ecn, Path csvFile, InetSocketAddress target, double speedMultiplier) {
+    public FeedReplayTask(String ecn, Path csvFile, Publication publication, double speedMultiplier) {
         this.ecn = ecn;
         this.csvFile = csvFile;
-        this.target = target;
+        this.publication = publication;
         this.speedMultiplier = speedMultiplier;
     }
 
     @Override
     public void run() {
-        var buf = ByteBuffer.allocate(BUF_SIZE);
-        var directBuffer = new UnsafeBuffer(buf);
+        var directBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(BUF_SIZE));
         var headerEncoder = new MessageHeaderEncoder();
         var deltaEncoder = new FxFeedDeltaEncoder();
 
@@ -55,15 +52,12 @@ public class FeedReplayTask implements Runnable {
                 .version(FxFeedDeltaEncoder.SCHEMA_VERSION);
 
         long csvBaseTimestamp = -1;
-        long wallBaseNanos = -1;
         long prevCsvTimestamp = -1;
         long sequenceCounter = epochNanosNow() ^ ((long) ecn.hashCode() << 32);
         int rowCount = 0;
+        long dropCount = 0;
 
-        try (var socket = new DatagramSocket();
-             BufferedReader reader = Files.newBufferedReader(csvFile)) {
-
-            var packet = new DatagramPacket(buf.array(), BUF_SIZE, target);
+        try (BufferedReader reader = Files.newBufferedReader(csvFile)) {
             String line;
 
             while ((line = reader.readLine()) != null) {
@@ -78,8 +72,6 @@ public class FeedReplayTask implements Runnable {
                     continue;
                 }
 
-                // CSV sequence number used only for ordering; generate contiguous sequence for the wire
-                // fields[0] = csv sequence (ignored), fields[1] = ecn (used for routing, not encoded)
                 CcyPair ccyPair       = CcyPair.valueOf(fields[2].strip());
                 long csvTimestamp      = Long.parseLong(fields[3].strip());
                 long bidMantissa      = decimalToMantissa(fields[4].strip());
@@ -87,16 +79,10 @@ public class FeedReplayTask implements Runnable {
                 long askMantissa      = decimalToMantissa(fields[6].strip());
                 int  askSize          = Integer.parseInt(fields[7].strip());
 
-                // Anchor first row to current wall-clock time
                 if (csvBaseTimestamp < 0) {
                     csvBaseTimestamp = csvTimestamp;
-                    wallBaseNanos = epochNanosNow();
                 }
 
-                // Rebase timestamp: preserve CSV deltas, anchor to wall-clock
-                long rebasedTimestamp = wallBaseNanos + (csvTimestamp - csvBaseTimestamp);
-
-                // Pace: sleep for the timestamp delta scaled by speed multiplier
                 if (prevCsvTimestamp >= 0 && speedMultiplier > 0) {
                     long deltaNs = csvTimestamp - prevCsvTimestamp;
                     if (deltaNs > 0) {
@@ -106,7 +92,11 @@ public class FeedReplayTask implements Runnable {
                 }
                 prevCsvTimestamp = csvTimestamp;
 
-                // Encode SBE message (header already written once, reuse it)
+                // Capture after the sleep so feedTimestamp reflects actual send time,
+                // not the pre-sleep ideal. On WSL2/coarse-timer hosts parkNanos overshoots
+                // significantly, making pre-sleep timestamps appear 10–100ms stale.
+                long rebasedTimestamp = epochNanosNow();
+
                 deltaEncoder.wrap(directBuffer, MessageHeaderEncoder.ENCODED_LENGTH);
                 deltaEncoder.sequenceNumber(++sequenceCounter);
                 deltaEncoder.ccyPair(ccyPair);
@@ -116,25 +106,30 @@ public class FeedReplayTask implements Runnable {
                 deltaEncoder.bidPrice().mantissa(bidMantissa);
                 deltaEncoder.bidSize(bidSize);
 
-                socket.send(packet);
-                rowCount++;
-                if (log.isDebugEnabled()) {
+                long result = publication.offer(directBuffer, 0, BUF_SIZE);
+                if (result >= 0) {
+                    rowCount++;
+                } else {
+                    dropCount++;
+                    if (log.isDebugEnabled() && dropCount % LOG_SAMPLE_INTERVAL == 0) {
+                        log.debug("[{}] Aeron back-pressure: result={} dropped={}", ecn, result, dropCount);
+                    }
+                }
+
+                if (log.isDebugEnabled() && rowCount % LOG_SAMPLE_INTERVAL == 0) {
                     log.debug("[{}] seq={} {} bid={}/{} ask={}/{} ts={}",
                             ecn, sequenceCounter, ccyPair,
                             bidMantissa, bidSize, askMantissa, askSize, rebasedTimestamp);
                 }
             }
 
-            log.info("[{}] Replay complete — {} datagrams sent to {}", ecn, rowCount, target);
+            log.info("[{}] Replay complete — {} messages offered, {} dropped", ecn, rowCount, dropCount);
 
         } catch (IOException e) {
             log.error("[{}] I/O error replaying {}", ecn, csvFile, e);
         }
     }
 
-    /**
-     * Returns current wall-clock time as nanoseconds since Unix epoch.
-     */
     private static long epochNanosNow() {
         Instant now = Instant.now();
         return now.getEpochSecond() * 1_000_000_000L + now.getNano();
@@ -144,15 +139,12 @@ public class FeedReplayTask implements Runnable {
      * Converts a decimal price string (e.g. "1.08760") to a Decimal5 mantissa (e.g. 108760).
      */
     static long decimalToMantissa(String price) {
-        // Use BigDecimal-free integer arithmetic to avoid allocation:
-        // split on '.', pad/truncate fractional part to exactly 5 digits
         int dot = price.indexOf('.');
         if (dot < 0) {
             return Long.parseLong(price) * 100_000L;
         }
         String intPart = price.substring(0, dot);
         String fracPart = price.substring(dot + 1);
-        // Pad or truncate to 5 digits
         if (fracPart.length() > 5) {
             fracPart = fracPart.substring(0, 5);
         } else {

@@ -41,9 +41,9 @@ public class AeronFxMarketDataPublisher implements SmartLifecycle {
     private long publishCount;
     private long dropCount;
 
-    public AeronFxMarketDataPublisher(AeronPublisherProperties properties, UdpFeedProperties udpProperties) {
+    public AeronFxMarketDataPublisher(AeronPublisherProperties properties, AeronFeedProperties feedProperties) {
         this.properties = properties;
-        this.ecn = Ecn.valueOf(udpProperties.ecn());
+        this.ecn = Ecn.valueOf(feedProperties.ecn());
 
         // Pre-encode the SBE header — it never changes
         headerEncoder.wrap(buffer, 0)

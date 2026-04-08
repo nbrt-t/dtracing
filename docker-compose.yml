@@ -186,6 +186,21 @@ services:
     networks:
       - dtracing
 
+  # ── Simulator ──────────────────────────────────────────────────────────────
+
+  simulator:
+    profiles: ["simulator"]
+    build:
+      context: .
+      target: simulator
+    container_name: simulator
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    volumes:
+      - aeron-dir:/dev/shm/aeron
+    networks:
+      - dtracing
+
 volumes:
   aeron-dir:
     driver: local

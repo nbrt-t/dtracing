@@ -37,7 +37,7 @@ class BookBuilderProcessorTest {
         when(tracePublisher.publishSpan(anyLong(), anyLong(), any(Stage.class), any(Ecn.class),
                 any(CcyPair.class), anyLong(), anyLong(), anyLong()))
                 .thenAnswer(inv -> clock.incrementAndGet());
-        when(tracePublisher.publishSpan(anyLong(), anyLong(), any(Stage.class), any(Ecn.class),
+        lenient().when(tracePublisher.publishSpan(anyLong(), anyLong(), any(Stage.class), any(Ecn.class),
                 any(CcyPair.class), anyLong(), anyLong(), anyLong(), anyInt()))
                 .thenAnswer(inv -> clock.incrementAndGet());
         processor = new BookBuilderProcessor(publisher, tracePublisher,

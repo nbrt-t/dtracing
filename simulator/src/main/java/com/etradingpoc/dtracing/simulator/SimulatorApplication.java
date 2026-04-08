@@ -1,5 +1,7 @@
 package com.etradingpoc.dtracing.simulator;
 
+import io.aeron.Aeron;
+import io.aeron.Publication;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -7,7 +9,6 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
-import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,29 +37,33 @@ public class SimulatorApplication implements CommandLineRunner {
             return;
         }
 
-        log.info("Starting replay of {} feed(s) at {}x speed", feeds.size(), properties.speedMultiplier());
+        log.info("Starting replay of {} feed(s) at {}x speed via Aeron IPC dir={}",
+                feeds.size(), properties.speedMultiplier(), properties.aeronDir());
 
-        List<Thread> threads = new ArrayList<>();
-        for (var feed : feeds) {
-            var csvPath = Path.of(feed.file());
-            if (!csvPath.toFile().exists()) {
-                log.error("[{}] CSV file not found: {}", feed.ecn(), csvPath.toAbsolutePath());
-                continue;
+        try (Aeron aeron = Aeron.connect(new Aeron.Context().aeronDirectoryName(properties.aeronDir()))) {
+            List<Thread> threads = new ArrayList<>();
+
+            for (var feed : feeds) {
+                var csvPath = Path.of(feed.file());
+                if (!csvPath.toFile().exists()) {
+                    log.error("[{}] CSV file not found: {}", feed.ecn(), csvPath.toAbsolutePath());
+                    continue;
+                }
+
+                Publication publication = aeron.addPublication("aeron:ipc", feed.streamId());
+                var task = new FeedReplayTask(feed.ecn(), csvPath, publication, properties.speedMultiplier());
+
+                var thread = Thread.ofVirtual()
+                        .name("replay-" + feed.ecn().toLowerCase())
+                        .start(task);
+                threads.add(thread);
+
+                log.info("[{}] Replaying {} → aeron:ipc stream={}", feed.ecn(), csvPath, feed.streamId());
             }
 
-            var target = new InetSocketAddress(feed.targetHost(), feed.targetPort());
-            var task = new FeedReplayTask(feed.ecn(), csvPath, target, properties.speedMultiplier());
-
-            var thread = Thread.ofVirtual()
-                    .name("replay-" + feed.ecn().toLowerCase())
-                    .start(task);
-            threads.add(thread);
-
-            log.info("[{}] Replaying {} → {}", feed.ecn(), csvPath, target);
-        }
-
-        for (var thread : threads) {
-            thread.join();
+            for (var thread : threads) {
+                thread.join();
+            }
         }
 
         log.info("All feeds replayed. Simulator shutting down.");

@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 MVN   := ./mvnw
 DC    := docker compose
-DC_SIM := docker compose -f docker-compose.simulator.yml
+DC_SIM := docker compose --profile simulator
 
 # Overridable ports (e.g. make infra GRAFANA_PORT=3002)
 export GRAFANA_PORT    ?= 3001
@@ -29,8 +29,7 @@ package: ## Package all modules (skip tests)
 
 clean: ## Maven clean + remove Docker images
 	$(MVN) -B clean
-	$(DC) down --rmi local --remove-orphans 2>/dev/null || true
-	$(DC_SIM) down --rmi local 2>/dev/null || true
+	$(DC_SIM) down --rmi local --remove-orphans 2>/dev/null || true
 
 codegen: ## Regenerate SBE codecs in common module
 	$(MVN) -B compile -pl common
@@ -38,7 +37,6 @@ codegen: ## Regenerate SBE codecs in common module
 # ── Docker ──────────────────────────────────────────────────────────────────
 
 docker-build: ## Build all Docker images
-	$(DC) build
 	$(DC_SIM) build
 
 up: ## Start all market-data-handler instances (detached)
@@ -75,7 +73,7 @@ clean-traces: ## Delete all stored traces and Grafana data
 # ── Simulator ───────────────────────────────────────────────────────────────
 
 simulate: ## Run simulator at real-time speed
-	$(DC_SIM) up --build
+	$(DC_SIM) run --rm --build simulator
 
 simulate-fast: ## Run simulator at max speed
 	$(DC_SIM) run --rm -e SIMULATOR_SPEEDMULTIPLIER=1000 simulator
@@ -83,8 +81,6 @@ simulate-fast: ## Run simulator at max speed
 # ── Status ──────────────────────────────────────────────────────────────────
 
 status: ## Show running containers and ports
-	$(DC) ps
-	@echo "---"
 	$(DC_SIM) ps 2>/dev/null || true
 
 # ── Help ────────────────────────────────────────────────────────────────────

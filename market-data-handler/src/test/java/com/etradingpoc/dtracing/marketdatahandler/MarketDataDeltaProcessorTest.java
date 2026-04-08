@@ -28,7 +28,7 @@ class MarketDataDeltaProcessorTest {
 
     @BeforeEach
     void setUp() {
-        var props = new UdpFeedProperties("EURONEXT", "0.0.0.0", 9001, 1500, null);
+        var props = new AeronFeedProperties("EURONEXT", "/dev/shm/aeron/driver", "aeron:ipc", 3001);
         processor = new MarketDataDeltaProcessor(props, publisher, tracePublisher);
     }
 

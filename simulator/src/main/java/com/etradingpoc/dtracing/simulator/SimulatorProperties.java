@@ -7,21 +7,22 @@ import java.util.List;
 @ConfigurationProperties(prefix = "simulator")
 public record SimulatorProperties(
         List<FeedConfig> feeds,
-        double speedMultiplier
+        double speedMultiplier,
+        String aeronDir
 ) {
     public SimulatorProperties {
         if (feeds == null) feeds = List.of();
         if (speedMultiplier <= 0) speedMultiplier = 1.0;
+        if (aeronDir == null || aeronDir.isBlank()) aeronDir = "/dev/shm/aeron/driver";
     }
 
     public record FeedConfig(
             String ecn,
             String file,
-            String targetHost,
-            int targetPort
+            int streamId
     ) {
         public FeedConfig {
-            if (targetHost == null || targetHost.isBlank()) targetHost = "localhost";
+            if (streamId <= 0) streamId = 3000;
         }
     }
 }

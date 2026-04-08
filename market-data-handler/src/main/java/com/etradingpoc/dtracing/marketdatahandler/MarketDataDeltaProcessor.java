@@ -28,7 +28,7 @@ public class MarketDataDeltaProcessor implements MarketDataDeltaHandler {
     private long traceIdCounter;
     private final long traceIdSeed = System.nanoTime();
 
-    public MarketDataDeltaProcessor(UdpFeedProperties properties,
+    public MarketDataDeltaProcessor(AeronFeedProperties properties,
                                     AeronFxMarketDataPublisher publisher,
                                     TracePublisher tracePublisher) {
         this.ecn = properties.ecn();
