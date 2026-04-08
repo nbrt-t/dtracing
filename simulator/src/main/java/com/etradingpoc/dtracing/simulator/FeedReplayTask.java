@@ -14,11 +14,13 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.locks.LockSupport;
 
 /**
- * Replays a single ECN CSV file as {@code FxFeedDelta} SBE messages over Aeron IPC.
- * Pacing honours the timestamp deltas between rows, scaled by {@code speedMultiplier}.
+ * Replays a single ECN CSV file as {@code FxFeedDelta} SBE messages over Aeron IPC,
+ * looping continuously and cycling through the configured intensity (speed multiplier)
+ * list on each pass until the thread is interrupted.
  */
 public class FeedReplayTask implements Runnable {
 
@@ -30,13 +32,13 @@ public class FeedReplayTask implements Runnable {
     private final String ecn;
     private final Path csvFile;
     private final Publication publication;
-    private final double speedMultiplier;
+    private final List<Double> intensities;
 
-    public FeedReplayTask(String ecn, Path csvFile, Publication publication, double speedMultiplier) {
+    public FeedReplayTask(String ecn, Path csvFile, Publication publication, List<Double> intensities) {
         this.ecn = ecn;
         this.csvFile = csvFile;
         this.publication = publication;
-        this.speedMultiplier = speedMultiplier;
+        this.intensities = intensities;
     }
 
     @Override
@@ -51,16 +53,33 @@ public class FeedReplayTask implements Runnable {
                 .schemaId(FxFeedDeltaEncoder.SCHEMA_ID)
                 .version(FxFeedDeltaEncoder.SCHEMA_VERSION);
 
-        long csvBaseTimestamp = -1;
-        long prevCsvTimestamp = -1;
         long sequenceCounter = epochNanosNow() ^ ((long) ecn.hashCode() << 32);
+        int pass = 0;
+
+        while (!Thread.currentThread().isInterrupted()) {
+            double speed = intensities.get(pass % intensities.size());
+            log.info("[{}] Starting pass {} at {}x speed", ecn, pass + 1, speed);
+            sequenceCounter = replayOnce(directBuffer, deltaEncoder, sequenceCounter, speed);
+            pass++;
+        }
+
+        log.info("[{}] Replay stopped after {} pass(es)", ecn, pass);
+    }
+
+    /**
+     * Replays the CSV file once at the given speed multiplier.
+     * Returns the updated monotonic sequence counter for continuity across passes.
+     */
+    private long replayOnce(UnsafeBuffer directBuffer, FxFeedDeltaEncoder deltaEncoder,
+                            long sequenceCounter, double speedMultiplier) {
+        long prevCsvTimestamp = -1;
         int rowCount = 0;
         long dropCount = 0;
 
         try (BufferedReader reader = Files.newBufferedReader(csvFile)) {
             String line;
 
-            while ((line = reader.readLine()) != null) {
+            while (!Thread.currentThread().isInterrupted() && (line = reader.readLine()) != null) {
                 line = line.strip();
                 if (line.isEmpty() || line.startsWith("#") || line.startsWith("sequence_number")) {
                     continue;
@@ -72,22 +91,19 @@ public class FeedReplayTask implements Runnable {
                     continue;
                 }
 
-                CcyPair ccyPair       = CcyPair.valueOf(fields[2].strip());
-                long csvTimestamp      = Long.parseLong(fields[3].strip());
-                long bidMantissa      = decimalToMantissa(fields[4].strip());
-                int  bidSize          = Integer.parseInt(fields[5].strip());
-                long askMantissa      = decimalToMantissa(fields[6].strip());
-                int  askSize          = Integer.parseInt(fields[7].strip());
-
-                if (csvBaseTimestamp < 0) {
-                    csvBaseTimestamp = csvTimestamp;
-                }
+                CcyPair ccyPair  = CcyPair.valueOf(fields[2].strip());
+                long csvTimestamp = Long.parseLong(fields[3].strip());
+                long bidMantissa = decimalToMantissa(fields[4].strip());
+                int  bidSize     = Integer.parseInt(fields[5].strip());
+                long askMantissa = decimalToMantissa(fields[6].strip());
+                int  askSize     = Integer.parseInt(fields[7].strip());
 
                 if (prevCsvTimestamp >= 0 && speedMultiplier > 0) {
                     long deltaNs = csvTimestamp - prevCsvTimestamp;
                     if (deltaNs > 0) {
                         long sleepNs = (long) (deltaNs / speedMultiplier);
                         LockSupport.parkNanos(sleepNs);
+                        if (Thread.currentThread().isInterrupted()) break;
                     }
                 }
                 prevCsvTimestamp = csvTimestamp;
@@ -123,11 +139,13 @@ public class FeedReplayTask implements Runnable {
                 }
             }
 
-            log.info("[{}] Replay complete — {} messages offered, {} dropped", ecn, rowCount, dropCount);
+            log.info("[{}] Pass complete at {}x — {} offered, {} dropped", ecn, speedMultiplier, rowCount, dropCount);
 
         } catch (IOException e) {
             log.error("[{}] I/O error replaying {}", ecn, csvFile, e);
         }
+
+        return sequenceCounter;
     }
 
     private static long epochNanosNow() {

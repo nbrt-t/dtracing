@@ -10,7 +10,7 @@ export PROMETHEUS_PORT ?= 9090
 .PHONY: build clean compile test package \
         docker-build up up-debug down restart logs \
         infra infra-down clean-traces \
-        simulate simulate-fast \
+        simulate simulate-fast simulate-stop \
         status help
 
 # ── Maven ───────────────────────────────────────────────────────────────────
@@ -72,11 +72,14 @@ clean-traces: ## Delete all stored traces and Grafana data
 
 # ── Simulator ───────────────────────────────────────────────────────────────
 
-simulate: ## Run simulator at real-time speed
-	$(DC_SIM) run --rm --build simulator
+simulate: ## Start simulator at real-time speed (detached)
+	$(DC_SIM) up -d --build simulator
 
-simulate-fast: ## Run simulator at max speed
-	$(DC_SIM) run --rm -e SIMULATOR_SPEEDMULTIPLIER=1000 simulator
+simulate-fast: ## Start simulator at max speed (detached)
+	SIMULATOR_SPEEDMULTIPLIER=1000 $(DC_SIM) up -d --build simulator
+
+simulate-stop: ## Stop the running simulator
+	$(DC_SIM) stop simulator
 
 # ── Status ──────────────────────────────────────────────────────────────────
 

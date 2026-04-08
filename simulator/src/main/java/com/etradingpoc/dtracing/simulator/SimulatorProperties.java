@@ -8,11 +8,13 @@ import java.util.List;
 public record SimulatorProperties(
         List<FeedConfig> feeds,
         double speedMultiplier,
+        List<Double> intensities,
         String aeronDir
 ) {
     public SimulatorProperties {
         if (feeds == null) feeds = List.of();
         if (speedMultiplier <= 0) speedMultiplier = 1.0;
+        if (intensities == null || intensities.isEmpty()) intensities = List.of(speedMultiplier);
         if (aeronDir == null || aeronDir.isBlank()) aeronDir = "/dev/shm/aeron/driver";
     }
 

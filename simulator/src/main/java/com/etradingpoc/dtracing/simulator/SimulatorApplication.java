@@ -37,8 +37,8 @@ public class SimulatorApplication implements CommandLineRunner {
             return;
         }
 
-        log.info("Starting replay of {} feed(s) at {}x speed via Aeron IPC dir={}",
-                feeds.size(), properties.speedMultiplier(), properties.aeronDir());
+        log.info("Starting continuous replay of {} feed(s) cycling intensities={} via Aeron IPC dir={}",
+                feeds.size(), properties.intensities(), properties.aeronDir());
 
         try (Aeron aeron = Aeron.connect(new Aeron.Context().aeronDirectoryName(properties.aeronDir()))) {
             List<Thread> threads = new ArrayList<>();
@@ -51,7 +51,7 @@ public class SimulatorApplication implements CommandLineRunner {
                 }
 
                 Publication publication = aeron.addPublication("aeron:ipc", feed.streamId());
-                var task = new FeedReplayTask(feed.ecn(), csvPath, publication, properties.speedMultiplier());
+                var task = new FeedReplayTask(feed.ecn(), csvPath, publication, properties.intensities());
 
                 var thread = Thread.ofVirtual()
                         .name("replay-" + feed.ecn().toLowerCase())
@@ -61,11 +61,19 @@ public class SimulatorApplication implements CommandLineRunner {
                 log.info("[{}] Replaying {} → aeron:ipc stream={}", feed.ecn(), csvPath, feed.streamId());
             }
 
+            Runtime.getRuntime().addShutdownHook(Thread.ofVirtual().unstarted(() -> {
+                log.info("Shutdown requested — interrupting {} replay thread(s)", threads.size());
+                threads.forEach(Thread::interrupt);
+                for (var t : threads) {
+                    try { t.join(5_000); } catch (InterruptedException ignored) {}
+                }
+            }));
+
             for (var thread : threads) {
                 thread.join();
             }
         }
 
-        log.info("All feeds replayed. Simulator shutting down.");
+        log.info("Simulator shutting down.");
     }
 }
