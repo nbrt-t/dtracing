@@ -37,6 +37,9 @@ class BookBuilderProcessorTest {
         when(tracePublisher.publishSpan(anyLong(), anyLong(), any(Stage.class), any(Ecn.class),
                 any(CcyPair.class), anyLong(), anyLong(), anyLong()))
                 .thenAnswer(inv -> clock.incrementAndGet());
+        when(tracePublisher.publishSpan(anyLong(), anyLong(), any(Stage.class), any(Ecn.class),
+                any(CcyPair.class), anyLong(), anyLong(), anyLong(), anyInt()))
+                .thenAnswer(inv -> clock.incrementAndGet());
         processor = new BookBuilderProcessor(publisher, tracePublisher,
                 new ConflationProperties(10), clock::get);
     }
@@ -370,6 +373,50 @@ class BookBuilderProcessorTest {
 
         verify(tracePublisher, times(1)).publishSpanLink(
                 anyLong(), anyLong(), anyLong(), anyLong(), eq(CcyPair.EURUSD));
+    }
+
+    // ── CONFLATION_WAIT span tests ────────────────────────────────
+
+    @Test
+    void flushDirtyPairs_emitsConflationWaitSpan() {
+        processor.onMarketData(encodeMarketData(Ecn.EBS, CcyPair.EURUSD,
+                108760L, 100, 108780L, 100, 1L, 1L, 1L));
+        clock.addAndGet(1_000_000L); // within window — suppressed
+        processor.onMarketData(encodeMarketData(Ecn.EBS, CcyPair.EURUSD,
+                108770L, 200, 108790L, 200, 2L, 2L, 2L));
+
+        clock.addAndGet(WINDOW_NANOS);
+        var stageCaptor = ArgumentCaptor.forClass(Stage.class);
+        processor.flushDirtyPairs();
+
+        verify(tracePublisher, atLeastOnce()).publishSpan(
+                anyLong(), anyLong(), stageCaptor.capture(), any(), any(), anyLong(), anyLong(), anyLong(), anyInt());
+        assertThat(stageCaptor.getAllValues()).containsExactly(Stage.CONFLATION_WAIT);
+    }
+
+    @Test
+    void flushDirtyPairs_heldTicksCountIsCorrect() {
+        processor.onMarketData(encodeMarketData(Ecn.EBS, CcyPair.EURUSD,
+                108760L, 100, 108780L, 100, 1L, 1L, 1L));
+        // 3 ticks suppressed
+        clock.addAndGet(1_000_000L);
+        processor.onMarketData(encodeMarketData(Ecn.EBS, CcyPair.EURUSD,
+                108770L, 200, 108790L, 200, 2L, 2L, 2L));
+        clock.addAndGet(1_000_000L);
+        processor.onMarketData(encodeMarketData(Ecn.EBS, CcyPair.EURUSD,
+                108775L, 250, 108795L, 250, 3L, 3L, 3L));
+        clock.addAndGet(1_000_000L);
+        processor.onMarketData(encodeMarketData(Ecn.EBS, CcyPair.EURUSD,
+                108780L, 300, 108800L, 300, 4L, 4L, 4L));
+
+        clock.addAndGet(WINDOW_NANOS);
+        var heldCaptor = ArgumentCaptor.forClass(Integer.class);
+        processor.flushDirtyPairs();
+
+        verify(tracePublisher).publishSpan(
+                anyLong(), anyLong(), eq(Stage.CONFLATION_WAIT), any(), any(), anyLong(), anyLong(), anyLong(),
+                heldCaptor.capture());
+        assertThat(heldCaptor.getValue()).isEqualTo(3); // 2 in link buffer + 1 pending
     }
 
     @Test

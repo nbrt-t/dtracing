@@ -87,6 +87,18 @@ public class TracePublisher implements AutoCloseable {
     public long publishSpan(long traceId, long parentSpanId, Stage stage,
                             Ecn ecn, CcyPair ccyPair, long sequenceNumber,
                             long timestampIn, long timestampOut) {
+        return publishSpan(traceId, parentSpanId, stage, ecn, ccyPair, sequenceNumber,
+                timestampIn, timestampOut, 0);
+    }
+
+    /**
+     * Publish a trace span with an explicit held-tick count (CONFLATION_WAIT spans).
+     *
+     * @param heldTicks number of ticks suppressed during this conflation window
+     */
+    public long publishSpan(long traceId, long parentSpanId, Stage stage,
+                            Ecn ecn, CcyPair ccyPair, long sequenceNumber,
+                            long timestampIn, long timestampOut, int heldTicks) {
         long spanId = spanIdPrefix | ++spanCounter;
 
         encoder.wrap(buffer, MessageHeaderEncoder.ENCODED_LENGTH);
@@ -99,10 +111,11 @@ public class TracePublisher implements AutoCloseable {
         encoder.sequenceNumber(sequenceNumber);
         encoder.timestampIn(timestampIn);
         encoder.timestampOut(timestampOut);
+        encoder.heldTicks(heldTicks);
 
         if (log.isDebugEnabled()) {
-            log.debug("traceId={} spanId={} parentSpanId={} stage={} ecn={} ccyPair={} seq={} in={} out={}",
-                    traceId, spanId, parentSpanId, stage, ecn, ccyPair, sequenceNumber, timestampIn, timestampOut);
+            log.debug("traceId={} spanId={} parentSpanId={} stage={} ecn={} ccyPair={} seq={} in={} out={} heldTicks={}",
+                    traceId, spanId, parentSpanId, stage, ecn, ccyPair, sequenceNumber, timestampIn, timestampOut, heldTicks);
         }
 
         publication.offer(buffer, 0, SPAN_BUF_SIZE);

@@ -65,7 +65,8 @@
             <validValue name="MID_PRICE"    description="Mid pricer — mid price calculation">2</validValue>
             <validValue name="PRICE_TIER"   description="Price tiering — spread application">3</validValue>
             <validValue name="MDH_PROCESS"  description="Market data handler — internal processing (decode, book update, publish)">4</validValue>
-            <validValue name="TRANSPORT"    description="Aeron message transport between pipeline stages">5</validValue>
+            <validValue name="TRANSPORT"       description="Aeron message transport between pipeline stages">5</validValue>
+            <validValue name="CONFLATION_WAIT" description="Book builder — conflation hold before downstream publish">6</validValue>
         </enum>
 
     </types>
@@ -238,6 +239,8 @@
                description="Nanosecond wall-clock time when message was received"/>
         <field name="timestampOut"   id="9"  type="NanoTimestamp"
                description="Nanosecond wall-clock time when processing completed"/>
+        <field name="heldTicks"      id="10" type="int32"
+               description="Number of ticks held during conflation (CONFLATION_WAIT spans only; 0 otherwise)"/>
     </message>
 
     <!-- ════════════════════════════════════════════════════════════════════════

@@ -2,6 +2,7 @@ package com.etradingpoc.dtracing.tracecollector;
 
 import com.etradingpoc.dtracing.common.sbe.SpanLinkDecoder;
 import com.etradingpoc.dtracing.common.sbe.TraceSpanDecoder;
+import io.opentelemetry.api.common.AttributesBuilder;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.SpanContext;
@@ -38,6 +39,7 @@ public class OtelTraceExporter implements AutoCloseable {
     private static final AttributeKey<String> ATTR_SEQ_NUM = AttributeKey.stringKey("fx.sequenceNumber");
     private static final AttributeKey<Long> ATTR_TRACE_ID = AttributeKey.longKey("pipeline.traceId");
     private static final AttributeKey<Long> ATTR_LATENCY_NS = AttributeKey.longKey("pipeline.latencyNanos");
+    private static final AttributeKey<Long> ATTR_HELD_TICKS = AttributeKey.longKey("conflation.held_ticks");
 
     private static final int BATCH_SIZE = 64;
 
@@ -84,20 +86,28 @@ public class OtelTraceExporter implements AutoCloseable {
         long sequenceNumber = decoder.sequenceNumber();
         long timestampIn = decoder.timestampIn();
         long timestampOut = decoder.timestampOut();
+        int heldTicks = decoder.heldTicks();
 
-        Attributes attrs = Attributes.builder()
+        AttributesBuilder attrsBuilder = Attributes.builder()
                 .put(ATTR_STAGE, stage)
                 .put(ATTR_ECN, ecn)
                 .put(ATTR_CCY_PAIR, ccyPair)
                 .put(ATTR_SEQ_NUM, Long.toUnsignedString(sequenceNumber))
                 .put(ATTR_TRACE_ID, traceId)
-                .put(ATTR_LATENCY_NS, timestampOut - timestampIn)
-                .build();
+                .put(ATTR_LATENCY_NS, timestampOut - timestampIn);
+        if (heldTicks > 0) {
+            attrsBuilder.put(ATTR_HELD_TICKS, (long) heldTicks);
+        }
+        Attributes attrs = attrsBuilder.build();
 
         String spanName = stage + " " + ccyPair;
 
+        // Guard against feedTimestamp racing ahead of wall-clock when the simulator
+        // fast-forwards time: a negative span duration wraps to ~2^64 ns in Tempo.
+        long endNanos = Math.max(timestampIn, timestampOut);
+
         batch.add(new RawSpan(traceId, spanId, parentSpanId, spanName,
-                timestampIn, timestampOut, attrs));
+                timestampIn, endNanos, attrs));
 
         if (batch.size() >= BATCH_SIZE) {
             flush();

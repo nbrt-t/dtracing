@@ -170,15 +170,25 @@ public class BookBuilderProcessor implements FxMarketDataHandler {
         for (int c = 0; c < CCY_PAIR_COUNT; c++) {
             if (dirty[c] && (now - lastPublishNanos[c] >= conflationWindowNanos)) {
                 CcyPair ccyPair = CcyPair.values()[c];
+                long publishNow = TracePublisher.epochNanosNow();
+
+                // linkCount is zeroed by emitSpanLinks, so capture before calling it
+                int heldTicks = linkCount[c] + 1;
 
                 // Emit span links from the pending span to all earlier suppressed spans
                 emitSpanLinks(c, ccyPair, pendingTraceId[c], pendingSpanId[c]);
+
+                // Bracket the conflation dwell explicitly: BOOK_BUILD finish → actual publish
+                long conflationWaitSpanId = tracePublisher.publishSpan(
+                        pendingTraceId[c], pendingSpanId[c], Stage.CONFLATION_WAIT,
+                        pendingEcn[c], ccyPair, pendingSeqNo[c],
+                        pendingTimestampOut[c], publishNow, heldTicks);
 
                 for (int e = 0; e < ECN_COUNT; e++) {
                     venueSlice[e] = venueBooks[e][c];
                 }
                 publisher.publishSnapshot(ccyPair, venueSlice, pendingEcn[c],
-                        pendingTraceId[c], pendingSpanId[c], pendingSeqNo[c], pendingTimestampOut[c]);
+                        pendingTraceId[c], conflationWaitSpanId, pendingSeqNo[c], publishNow);
                 lastPublishNanos[c] = now;
                 dirty[c] = false;
             }
