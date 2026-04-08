@@ -78,6 +78,7 @@ public class AeronFxMarketDataSubscriber implements SmartLifecycle {
         while (running) {
             int fragmentsRead = subscription.poll((buffer, offset, length, header) ->
                     onFragment(buffer, offset, headerDecoder, marketDataDecoder), 10);
+            handler.flushDirtyPairs();
             idleStrategy.idle(fragmentsRead);
         }
     }

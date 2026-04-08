@@ -1,23 +1,32 @@
 package com.etradingpoc.dtracing.tracecollector;
 
+import com.etradingpoc.dtracing.common.sbe.SpanLinkDecoder;
 import com.etradingpoc.dtracing.common.sbe.TraceSpanDecoder;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.trace.SpanContext;
+import io.opentelemetry.api.trace.TraceFlags;
+import io.opentelemetry.api.trace.TraceState;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 import io.opentelemetry.sdk.common.InstrumentationScopeInfo;
 import io.opentelemetry.sdk.resources.Resource;
+import io.opentelemetry.sdk.trace.data.LinkData;
 import io.opentelemetry.sdk.trace.data.SpanData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Converts decoded SBE {@code TraceSpan} messages into OTel {@link SpanData}
  * and exports them via OTLP gRPC to Tempo.
  * <p>
  * Batches spans and flushes periodically or when the batch is full.
+ * {@code SpanLink} messages received before flush are resolved and attached
+ * to their owning span at flush time.
  */
 public class OtelTraceExporter implements AutoCloseable {
 
@@ -35,7 +44,12 @@ public class OtelTraceExporter implements AutoCloseable {
     private final OtlpGrpcSpanExporter exporter;
     private final Resource resource;
     private final InstrumentationScopeInfo scopeInfo;
-    private final List<SpanData> batch = new ArrayList<>(BATCH_SIZE);
+
+    /** Raw span data before link resolution — keyed by spanId for link attachment. */
+    private final List<RawSpan> batch = new ArrayList<>(BATCH_SIZE);
+
+    /** Buffered span links — keyed by owning spanId. */
+    private final Map<Long, List<LinkData>> pendingLinks = new HashMap<>();
 
     private long exportCount;
 
@@ -57,7 +71,7 @@ public class OtelTraceExporter implements AutoCloseable {
     }
 
     /**
-     * Convert a decoded TraceSpan to OTel SpanData and add to the batch.
+     * Convert a decoded TraceSpan to a raw span record and add to the batch.
      * Flushes when the batch is full.
      */
     public void onTraceSpan(TraceSpanDecoder decoder) {
@@ -82,12 +96,8 @@ public class OtelTraceExporter implements AutoCloseable {
 
         String spanName = stage + " " + ccyPair;
 
-        SpanData spanData = PipelineSpanData.create(
-                traceId, spanId, parentSpanId,
-                spanName, timestampIn, timestampOut,
-                attrs, resource, scopeInfo);
-
-        batch.add(spanData);
+        batch.add(new RawSpan(traceId, spanId, parentSpanId, spanName,
+                timestampIn, timestampOut, attrs));
 
         if (batch.size() >= BATCH_SIZE) {
             flush();
@@ -95,15 +105,67 @@ public class OtelTraceExporter implements AutoCloseable {
     }
 
     /**
-     * Flush any buffered spans to the OTLP exporter.
+     * Buffer a span link. At flush time, links are attached to their owning span.
+     */
+    public void onSpanLink(SpanLinkDecoder decoder) {
+        long spanId = decoder.spanId();
+        long linkedTraceId = decoder.linkedTraceId();
+        long linkedSpanId = decoder.linkedSpanId();
+
+        String linkedTraceIdHex = String.format("%032x", linkedTraceId);
+        String linkedSpanIdHex = String.format("%016x", linkedSpanId);
+
+        SpanContext linkedCtx = SpanContext.create(
+                linkedTraceIdHex, linkedSpanIdHex,
+                TraceFlags.getSampled(), TraceState.getDefault());
+
+        LinkData link = LinkData.create(linkedCtx);
+
+        pendingLinks.computeIfAbsent(spanId, _ -> new ArrayList<>()).add(link);
+
+        if (log.isDebugEnabled()) {
+            log.debug("buffered spanLink ownerSpanId={} → linkedTraceId={} linkedSpanId={}",
+                    String.format("%016x", spanId), linkedTraceIdHex, linkedSpanIdHex);
+        }
+    }
+
+    /**
+     * Flush any buffered spans to the OTLP exporter, resolving span links.
      */
     public void flush() {
         if (batch.isEmpty()) {
+            pendingLinks.clear();
             return;
         }
-        exportCount += batch.size();
-        exporter.export(List.copyOf(batch));
+
+        List<SpanData> resolved = new ArrayList<>(batch.size());
+        for (RawSpan raw : batch) {
+            List<LinkData> links = pendingLinks.getOrDefault(raw.spanId(), List.of());
+            resolved.add(PipelineSpanData.create(
+                    raw.traceId(), raw.spanId(), raw.parentSpanId(),
+                    raw.name(), raw.startEpochNanos(), raw.endEpochNanos(),
+                    raw.attributes(), resource, scopeInfo, links));
+        }
+
+        if (log.isDebugEnabled()) {
+            for (SpanData span : resolved) {
+                log.debug("exporting span traceId={} spanId={} name={} links={}",
+                        span.getSpanContext().getTraceId(),
+                        span.getSpanContext().getSpanId(),
+                        span.getName(),
+                        span.getLinks().size());
+                for (LinkData link : span.getLinks()) {
+                    log.debug("  link → traceId={} spanId={}",
+                            link.getSpanContext().getTraceId(),
+                            link.getSpanContext().getSpanId());
+                }
+            }
+        }
+
+        exportCount += resolved.size();
+        exporter.export(resolved);
         batch.clear();
+        pendingLinks.clear();
     }
 
     public long exportCount() {
@@ -116,4 +178,9 @@ public class OtelTraceExporter implements AutoCloseable {
         exporter.close();
         log.info("OTel trace exporter closed — total exported={}", exportCount);
     }
+
+    private record RawSpan(
+            long traceId, long spanId, long parentSpanId,
+            String name, long startEpochNanos, long endEpochNanos,
+            Attributes attributes) {}
 }

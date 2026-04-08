@@ -1,6 +1,7 @@
 package com.etradingpoc.dtracing.tracecollector;
 
 import com.etradingpoc.dtracing.common.sbe.MessageHeaderDecoder;
+import com.etradingpoc.dtracing.common.sbe.SpanLinkDecoder;
 import com.etradingpoc.dtracing.common.sbe.TraceSpanDecoder;
 import io.aeron.Aeron;
 import io.aeron.Subscription;
@@ -14,8 +15,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Standalone sidecar process that subscribes to the Aeron trace channel,
- * decodes {@code TraceSpan} SBE messages, and exports them as OTLP spans
- * to Tempo via gRPC.
+ * decodes {@code TraceSpan} and {@code SpanLink} SBE messages, and exports
+ * them as OTLP spans (with links) to Tempo via gRPC.
  * <p>
  * Configuration via system properties:
  * <ul>
@@ -78,12 +79,13 @@ public class TraceCollectorLauncher {
                                   AtomicBoolean running, long flushIntervalMs) {
         var headerDecoder = new MessageHeaderDecoder();
         var traceSpanDecoder = new TraceSpanDecoder();
+        var spanLinkDecoder = new SpanLinkDecoder();
         IdleStrategy idleStrategy = new SleepingMillisIdleStrategy(1);
         long lastFlushTime = System.currentTimeMillis();
 
         while (running.get()) {
             int fragmentsRead = subscription.poll((buffer, offset, length, header) ->
-                    onFragment(buffer, offset, headerDecoder, traceSpanDecoder, exporter), 64);
+                    onFragment(buffer, offset, headerDecoder, traceSpanDecoder, spanLinkDecoder, exporter), 64);
             idleStrategy.idle(fragmentsRead);
 
             // Periodic flush
@@ -98,12 +100,17 @@ public class TraceCollectorLauncher {
     private static void onFragment(DirectBuffer buffer, int offset,
                                     MessageHeaderDecoder headerDecoder,
                                     TraceSpanDecoder traceSpanDecoder,
+                                    SpanLinkDecoder spanLinkDecoder,
                                     OtelTraceExporter exporter) {
         headerDecoder.wrap(buffer, offset);
-        if (headerDecoder.templateId() != TraceSpanDecoder.TEMPLATE_ID) {
-            return;
+
+        int templateId = headerDecoder.templateId();
+        if (templateId == TraceSpanDecoder.TEMPLATE_ID) {
+            traceSpanDecoder.wrapAndApplyHeader(buffer, offset, headerDecoder);
+            exporter.onTraceSpan(traceSpanDecoder);
+        } else if (templateId == SpanLinkDecoder.TEMPLATE_ID) {
+            spanLinkDecoder.wrapAndApplyHeader(buffer, offset, headerDecoder);
+            exporter.onSpanLink(spanLinkDecoder);
         }
-        traceSpanDecoder.wrapAndApplyHeader(buffer, offset, headerDecoder);
-        exporter.onTraceSpan(traceSpanDecoder);
     }
 }

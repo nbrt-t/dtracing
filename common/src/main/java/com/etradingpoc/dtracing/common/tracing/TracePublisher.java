@@ -3,6 +3,7 @@ package com.etradingpoc.dtracing.common.tracing;
 import com.etradingpoc.dtracing.common.sbe.CcyPair;
 import com.etradingpoc.dtracing.common.sbe.Ecn;
 import com.etradingpoc.dtracing.common.sbe.MessageHeaderEncoder;
+import com.etradingpoc.dtracing.common.sbe.SpanLinkEncoder;
 import com.etradingpoc.dtracing.common.sbe.Stage;
 import com.etradingpoc.dtracing.common.sbe.TraceSpanEncoder;
 import io.aeron.Aeron;
@@ -25,11 +26,14 @@ import java.time.Instant;
 public class TracePublisher implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(TracePublisher.class);
-    private static final int BUF_SIZE = MessageHeaderEncoder.ENCODED_LENGTH + TraceSpanEncoder.BLOCK_LENGTH;
+    private static final int SPAN_BUF_SIZE = MessageHeaderEncoder.ENCODED_LENGTH + TraceSpanEncoder.BLOCK_LENGTH;
+    private static final int LINK_BUF_SIZE = MessageHeaderEncoder.ENCODED_LENGTH + SpanLinkEncoder.BLOCK_LENGTH;
 
-    private final UnsafeBuffer buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(BUF_SIZE));
+    private final UnsafeBuffer buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(SPAN_BUF_SIZE));
+    private final UnsafeBuffer linkBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(LINK_BUF_SIZE));
     private final MessageHeaderEncoder headerEncoder = new MessageHeaderEncoder();
     private final TraceSpanEncoder encoder = new TraceSpanEncoder();
+    private final SpanLinkEncoder linkEncoder = new SpanLinkEncoder();
 
     private final Aeron aeron;
     private final Publication publication;
@@ -42,7 +46,7 @@ public class TracePublisher implements AutoCloseable {
         this.aeron = Aeron.connect(new Aeron.Context().aeronDirectoryName(aeronDir));
         this.publication = aeron.addPublication(channel, streamId);
         this.spanIdPrefix = (long) stage.value() << 48;
-        initHeader();
+        initHeaders();
     }
 
     /** Package-private for testing — bypasses Aeron connection. */
@@ -50,15 +54,21 @@ public class TracePublisher implements AutoCloseable {
         this.aeron = aeron;
         this.publication = publication;
         this.spanIdPrefix = (long) stage.value() << 48;
-        initHeader();
+        initHeaders();
     }
 
-    private void initHeader() {
+    private void initHeaders() {
         headerEncoder.wrap(buffer, 0)
                 .blockLength(TraceSpanEncoder.BLOCK_LENGTH)
                 .templateId(TraceSpanEncoder.TEMPLATE_ID)
                 .schemaId(TraceSpanEncoder.SCHEMA_ID)
                 .version(TraceSpanEncoder.SCHEMA_VERSION);
+
+        headerEncoder.wrap(linkBuffer, 0)
+                .blockLength(SpanLinkEncoder.BLOCK_LENGTH)
+                .templateId(SpanLinkEncoder.TEMPLATE_ID)
+                .schemaId(SpanLinkEncoder.SCHEMA_ID)
+                .version(SpanLinkEncoder.SCHEMA_VERSION);
     }
 
     /**
@@ -95,8 +105,37 @@ public class TracePublisher implements AutoCloseable {
                     traceId, spanId, parentSpanId, stage, ecn, ccyPair, sequenceNumber, timestampIn, timestampOut);
         }
 
-        publication.offer(buffer, 0, BUF_SIZE);
+        publication.offer(buffer, 0, SPAN_BUF_SIZE);
         return spanId;
+    }
+
+    /**
+     * Publish a span link connecting a span to a causally-related span.
+     * Used by conflation to link the published snapshot's span to each
+     * suppressed tick's span.
+     *
+     * @param traceId       trace ID of the span that owns this link
+     * @param spanId        span ID that owns this link (the published span)
+     * @param linkedTraceId trace ID of the linked (conflated) span
+     * @param linkedSpanId  span ID of the linked (conflated) span
+     * @param ccyPair       currency pair
+     */
+    public void publishSpanLink(long traceId, long spanId,
+                                long linkedTraceId, long linkedSpanId,
+                                CcyPair ccyPair) {
+        linkEncoder.wrap(linkBuffer, MessageHeaderEncoder.ENCODED_LENGTH);
+        linkEncoder.traceId(traceId);
+        linkEncoder.spanId(spanId);
+        linkEncoder.linkedTraceId(linkedTraceId);
+        linkEncoder.linkedSpanId(linkedSpanId);
+        linkEncoder.ccyPair(ccyPair);
+
+        if (log.isDebugEnabled()) {
+            log.debug("spanLink traceId={} spanId={} → linkedTraceId={} linkedSpanId={} ccyPair={}",
+                    traceId, spanId, linkedTraceId, linkedSpanId, ccyPair);
+        }
+
+        publication.offer(linkBuffer, 0, LINK_BUF_SIZE);
     }
 
     /**

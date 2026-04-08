@@ -240,4 +240,24 @@
                description="Nanosecond wall-clock time when processing completed"/>
     </message>
 
+    <!-- ════════════════════════════════════════════════════════════════════════
+         Message 7 — SpanLink
+         Links a span to a causally-related span from a different trace.
+         Used by conflation: the published snapshot's BOOK_BUILD span links
+         back to each suppressed tick's BOOK_BUILD span.
+         ════════════════════════════════════════════════════════════════════════ -->
+    <message name="SpanLink" id="7"
+             description="Span link connecting a span to a causally-related span">
+        <field name="traceId"       id="1" type="uint64"
+               description="Trace ID of the span that owns this link"/>
+        <field name="spanId"        id="2" type="uint64"
+               description="Span ID that owns this link (the published span)"/>
+        <field name="linkedTraceId" id="3" type="uint64"
+               description="Trace ID of the linked (conflated) span"/>
+        <field name="linkedSpanId"  id="4" type="uint64"
+               description="Span ID of the linked (conflated) span"/>
+        <field name="ccyPair"       id="5" type="CcyPair"
+               description="Currency pair"/>
+    </message>
+
 </sbe:messageSchema>

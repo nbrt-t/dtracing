@@ -30,14 +30,16 @@ record PipelineSpanData(
         String name,
         long startEpochNanos,
         long endEpochNanos,
-        Attributes attributes
+        Attributes attributes,
+        List<LinkData> links
 ) implements SpanData {
 
     static PipelineSpanData create(
             long traceId, long spanId, long parentSpanId,
             String name, long startEpochNanos, long endEpochNanos,
             Attributes attributes, Resource resource,
-            InstrumentationScopeInfo scopeInfo) {
+            InstrumentationScopeInfo scopeInfo,
+            List<LinkData> links) {
 
         String traceIdHex = String.format("%032x", traceId);
         String spanIdHex = String.format("%016x", spanId);
@@ -56,7 +58,7 @@ record PipelineSpanData(
 
         return new PipelineSpanData(
                 ctx, parentCtx, resource, scopeInfo,
-                name, startEpochNanos, endEpochNanos, attributes);
+                name, startEpochNanos, endEpochNanos, attributes, links);
     }
 
     @Override public SpanContext getSpanContext()                    { return spanContext; }
@@ -69,11 +71,11 @@ record PipelineSpanData(
     @Override public long getEndEpochNanos()                        { return endEpochNanos; }
     @Override public Attributes getAttributes()                     { return attributes; }
     @Override public List<EventData> getEvents()                    { return List.of(); }
-    @Override public List<LinkData> getLinks()                      { return List.of(); }
+    @Override public List<LinkData> getLinks()                      { return links; }
     @Override public StatusData getStatus()                         { return StatusData.ok(); }
     @Override public boolean hasEnded()                             { return true; }
     @Override public int getTotalRecordedEvents()                   { return 0; }
-    @Override public int getTotalRecordedLinks()                    { return 0; }
+    @Override public int getTotalRecordedLinks()                    { return links.size(); }
     @Override public int getTotalAttributeCount()                   { return attributes.size(); }
 
     @SuppressWarnings("deprecation")
