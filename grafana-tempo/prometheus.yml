@@ -1,2 +1,5 @@
 global:
   scrape_interval: 15s
+  # default is 100 exemplars per series
+  exemplars_storage:
+    max_exemplars: 100

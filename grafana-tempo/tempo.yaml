@@ -23,7 +23,11 @@ metrics_generator:
     service_graphs:
       dimensions: []
     span_metrics:
-      dimensions: []
+      dimensions:
+        - pipeline.stage
+        - fx.ccyPair
+        - fx.ecn
+      enable_target_info: true
     local_blocks:          
       flush_to_storage: true
   storage:

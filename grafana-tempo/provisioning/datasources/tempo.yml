@@ -19,3 +19,7 @@ datasources:
     access: proxy
     url: http://prometheus:9090
     uid: prometheus
+    jsonData:
+      exemplarTraceIdDestinations:
+        - datasourceUid: tempo
+          name: trace_id

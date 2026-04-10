@@ -179,6 +179,7 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
     volumes:
       - ./grafana-tempo/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
